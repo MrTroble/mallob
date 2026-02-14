@@ -5,9 +5,12 @@
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "util/sys/process.hpp"
+#include "mgi/KernelLoader.hpp"
 
 void testRoutine() {
-    
+    KernelLoaderOCL loaderOCL;
+    Kernel kernel = loaderOCL.loadKernel("test");
+    assert(kernel.internal == 0);
 }
 
 int main(int argc, char* argv[]) {
