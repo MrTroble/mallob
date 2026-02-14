@@ -227,3 +227,5 @@ new_test(reverse_file_reader "${BASE_INCLUDES}" mallob_core)
 new_test(categorized_external_memory "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe_shmem "${BASE_INCLUDES}" mallob_core)
+
+new_test(mgi_base "${BASE_INCLUDES}" mallob_corepluscomm)
