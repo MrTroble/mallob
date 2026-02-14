@@ -8,10 +8,6 @@ find_package(Threads REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
 
-
-
-
-
 #Testing if march=native helps, but at least in quick laptop test, no, no change
 #add_compile_options(-march=native)
 
@@ -194,6 +190,26 @@ target_compile_options(mallob_corepluscomm PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} mallob_core ${BASE_LIBS})
 target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 
+# GPU Enables MGI compilation
+if(MALLOB_USE_GPU)
+message("GPU Support enabled")
+
+include(FetchContent)
+
+set(OPENCL_SDK_BUILD_SAMPLES false)
+FetchContent_Declare(
+  openclsdk
+  GIT_REPOSITORY         https://github.com/KhronosGroup/OpenCL-SDK
+  GIT_TAG                v2025.07.23
+  GIT_SUBMODULES_RECURSE true
+)
+FetchContent_MakeAvailable(openclsdk)
+
+add_library(mallob_mgi STATIC "src/mgi/KernelLoader.cpp")
+target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})
+target_compile_options(mallob_mgi PRIVATE ${BASE_COMPILEFLAGS})
+target_link_libraries(mallob_mgi mallob_corepluscomm)
+endif()
 
 # Executables
 
@@ -228,4 +244,6 @@ new_test(categorized_external_memory "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe_shmem "${BASE_INCLUDES}" mallob_core)
 
+if(MALLOB_USE_GPU)
 new_test(mgi_base "${BASE_INCLUDES}" mallob_corepluscomm)
+endif()

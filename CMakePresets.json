@@ -24,6 +24,13 @@
       "vendor": { "microsoft.com/VisualStudioRemoteSettings/CMake/2.0": { "remoteSourceRootDir": "$env{HOME}/.vs/$ms{projectDirName}" } }
     },
     {
+      "name": "linux-debug-gpu",
+      "displayName": "linux GPU Debug",
+      "description": "Target the Windows Subsystem for Linux (WSL) or a remote system with GPU support",
+      "inherits": "linux-debug",
+      "cacheVariables": { "MALLOB_USE_GPU": true }
+    },
+    {
       "name": "macos-debug",
       "displayName": "macOS Debug",
       "description": "Target a remote macOS system.",
