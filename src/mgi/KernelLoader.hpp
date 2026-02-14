@@ -2,14 +2,21 @@
 
 #include <string>
 
-struct Kernel {
-    size_t internal;
-};
+namespace mgi {
+    struct Kernel {
+        size_t internal;
+    };
 
-class KernelLoaderOCL {
+#ifdef MGI_API_OCL
+    class KernelLoaderOCL {
 
-public:
-    KernelLoaderOCL() = default;
+    public:
+        KernelLoaderOCL() = default;
 
-    Kernel loadKernel(const std::string& file);
-};
+        Kernel loadKernel(const std::string& file);
+    };
+
+    using KernelLoader = KernelLoaderOCL;
+#endif
+
+}

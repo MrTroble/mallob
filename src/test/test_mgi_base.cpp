@@ -6,9 +6,13 @@
 #include "util/params.hpp"
 #include "util/sys/process.hpp"
 #include "mgi/KernelLoader.hpp"
+#include "mgi/DeferredAPI.hpp"
+
+using namespace mgi;
 
 void testRoutine() {
-    KernelLoaderOCL loaderOCL;
+    
+    KernelLoader loaderOCL;
     Kernel kernel = loaderOCL.loadKernel("test");
     assert(kernel.internal == 0);
 }

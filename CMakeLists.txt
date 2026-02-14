@@ -187,17 +187,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(openclsdk)
 
-list(APPEND ${BASE_LIBS}
+set(BASE_LIBS ${BASE_LIBS}
         OpenCL::Headers
         OpenCL::HeadersCpp
         OpenCL::OpenCL
         OpenCL::Utils
-        OpenCL::UtilsCpp
-        OpenCL::SDK
-        OpenCL::SDKCpp) 
+        OpenCL::UtilsCpp) 
         
 set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP/include
                              ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
+
+# Currently default to OpenCL
+add_definitions(-DMGI_API_OCL=1)
 
 add_library(mallob_mgi STATIC "src/mgi/KernelLoader.cpp")
 target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})
