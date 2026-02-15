@@ -192,7 +192,7 @@ set(BASE_LIBS ${BASE_LIBS}
         OpenCL::HeadersCpp
         OpenCL::OpenCL
         OpenCL::Utils
-        OpenCL::UtilsCpp) 
+        OpenCL::UtilsCpp)
         
 set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP/include
                              ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)

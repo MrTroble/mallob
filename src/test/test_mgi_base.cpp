@@ -11,10 +11,7 @@
 using namespace mgi;
 
 void testRoutine() {
-    
-    KernelLoader loaderOCL;
-    Kernel kernel = loaderOCL.loadKernel("test");
-    assert(kernel.internal == 0);
+    DeferredAPI deferred = initMGI();
 }
 
 int main(int argc, char* argv[]) {
