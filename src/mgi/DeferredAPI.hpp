@@ -7,6 +7,20 @@
 
 namespace mgi {
 
+template<typename clType>
+struct Build {
+    clType value[33];
+    uint32_t current = 0;
+    
+    template<typename ValueType>
+    Build<clType>& with(int key, ValueType value) {
+        value[current] = (clType)key;
+        value[current+1] = (clType)value;
+        current += 2;
+        value[current] = 0;
+    }
+};
+
 struct InitInfo {
     std::vector<float> queuePriorities{1, 1.0f};
 };
@@ -14,7 +28,8 @@ struct InitInfo {
 struct OCLSetup {
     cl::Context context;
     cl::Platform platform;
-    std::vector<cl::CommandQueue> queues;
+    std::vector<cl::Device> devicesUsed;
+    std::vector<std::vector<cl::CommandQueue>> queues;
 };
 
 #ifdef MGI_API_OCL
@@ -31,14 +46,13 @@ inline OCLDeferredAPI initMGI(const InitInfo& info) {
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     cl::Platform usedPlatform;
-    std::vector<cl::Device> devices;
     for (auto platform : platforms)
     {
-        devices.clear();
+        setup.devicesUsed.clear();
         const auto profile = platform.getInfo<CL_PLATFORM_PROFILE>();
         if(profile != "FULL_PROFILE") continue;
-        platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
-        if (devices.empty()) {
+        platform.getDevices(CL_DEVICE_TYPE_GPU, &setup.devicesUsed);
+        if (setup.devicesUsed.empty()) {
             LOG(V4_VVER, "Platform has no GPU devices!\n");
             continue;
         }
@@ -57,12 +71,23 @@ inline OCLDeferredAPI initMGI(const InitInfo& info) {
     const auto name = usedPlatform.getInfo<CL_PLATFORM_NAME>();
     LOG(V5_DEBG, "Platform: %s\n", name.c_str());
 #endif
+    setup.platform = usedPlatform;
     const cl_platform_id platformID = usedPlatform();
-    const cl_context_properties contextFlags[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platformID, 0};
-    setup.context = cl::Context(devices, contextFlags);
-    for (auto priority : info.queuePriorities)
+    const auto contextFlags = Build<cl_context_properties>().with(CL_CONTEXT_PLATFORM, platformID);
+    setup.context = cl::Context(setup.devicesUsed, contextFlags.value);
+
+    const cl_command_queue_properties queueFlags = CL_QUEUE_ON_DEVICE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
+    size_t deviceID = 0;
+    for (const auto device : setup.devicesUsed)
     {
-        cl::CommandQueue queue(cl::QueueProperties::OutOfOrder);
+        auto& deviceQueues = setup.queues[deviceID++];
+        for (const auto priority : info.queuePriorities)
+        {
+            if (priority != 1.0f)
+                LOG(V1_WARN, "Currently priorities other then 1.0f are unsupported\n");
+            cl::CommandQueue queue(setup.context, device, queueFlags);
+            deviceQueues.push_back(queue);
+        }
     }
     return OCLDeferredAPI{setup};
 }
