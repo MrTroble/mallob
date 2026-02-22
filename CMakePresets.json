@@ -30,6 +30,15 @@
       "inherits": "linux-debug",
       "cacheVariables": { "MALLOB_USE_GPU": true }
     },
+        {
+      "name": "linux-debug-gpu-n",
+      "displayName": "nativ linux GPU Debug",
+      "description": "Target the Windows Subsystem for Linux (WSL) or a remote system with GPU support",
+      "inherits": "linux-debug",
+      "cacheVariables": { "MALLOB_USE_GPU": true,
+            "MALLOB_SUBPROC_DISPATCH_PATH": "\"build/\"",
+            "MALLOB_USE_ASAN": false}
+    },
     {
       "name": "macos-debug",
       "displayName": "macOS Debug",
