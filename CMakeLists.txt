@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Build-specific compile options
 
 set(BASE_LIBS Threads::Threads)
-set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb -Wall -Wno-sign-compare -Wno-unused-variable")
+set(CACHE{MY_DEBUG_OPTIONS} "-rdynamic -g -ggdb -Wall -Wno-sign-compare -Wno-unused-variable")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
     add_definitions(-DMALLOB_VERSION=\"dbg\")

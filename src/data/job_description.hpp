@@ -2,7 +2,7 @@
 #ifndef DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
 #define DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
 
-#include <ext/alloc_traits.h>
+#include <memory>
 #include <stdint.h>
 #include <vector>
 #include <cstring>

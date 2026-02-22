@@ -54,7 +54,13 @@
       "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
-        "CMAKE_CXX_COMPILER": "cl.exe"
+        "CMAKE_CXX_COMPILER": "cl.exe",
+        "MALLOB_LOG_VERBOSITY": "5",
+        "MALLOB_USE_ASAN": "1",
+        "MALLOB_SUBPROC_DISPATCH_PATH": "\\\"build/\\\"",
+        "MALLOB_APP_SAT": "1",
+        "MALLOB_ASSERT": "1",
+        "MY_DEBUG_OPTIONS": "-rdynamic -g -ggdb -Wall"
       },
       "condition": {
         "type": "equals",
@@ -72,6 +78,20 @@
         "strategy": "external"
       },
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "x64-debug-gpu",
+      "displayName": "x64 GPU Debug",
+      "description": "Target Windows (64-bit) with the Visual Studio development environment. (Debug)",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MALLOB_USE_GPU": true
+      }
     },
     {
       "name": "x64-release",
