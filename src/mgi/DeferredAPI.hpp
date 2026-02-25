@@ -13,11 +13,12 @@ struct Build {
     uint32_t current = 0;
     
     template<typename ValueType>
-    Build<clType>& with(int key, ValueType value) {
-        value[current] = (clType)key;
-        value[current+1] = (clType)value;
+    Build<clType>& with(int pKey, const ValueType pValue) {
+        value[current] = (clType) pKey;
+        value[current+1] = (clType) pValue;
         current += 2;
         value[current] = 0;
+        return *this;
     }
 };
 
@@ -41,7 +42,7 @@ public:
     OCLDeferredAPI(const OCLSetup& init) : init(init) {}
 };
 
-inline OCLDeferredAPI initMGI(const InitInfo& info) {
+inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
     OCLSetup setup;
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
