@@ -68,8 +68,11 @@ inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
     LOG(V5_DEBG, "Platform version: %s\n", version.c_str());
     const auto name = usedPlatform.getInfo<CL_PLATFORM_NAME>();
     LOG(V5_DEBG, "Platform: %s\n", name.c_str());
+    const auto extNames = usedPlatform.getInfo<CL_PLATFORM_EXTENSIONS>();
+    LOG(V5_DEBG, "Extensions: %s\n", extNames.c_str());
 #endif
     setup.platform = usedPlatform;
+    
     const cl_platform_id platformID = usedPlatform();
     const auto contextFlags = Build<cl_context_properties>().with(CL_CONTEXT_PLATFORM, platformID);
     setup.context = cl::Context(setup.devicesUsed, contextFlags.value);
@@ -84,6 +87,7 @@ inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
 #ifdef DEBUG
         const auto deviceName = device.getInfo<CL_DEVICE_NAME>();
         LOG(V5_DEBG, "Device %u: %s\n", deviceID, deviceName.c_str());
+        cl_int cppVersion = 0;
 #endif
         for (const auto priority : info.queuePriorities)
         {
