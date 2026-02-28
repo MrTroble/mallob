@@ -79,9 +79,14 @@ inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
 
     const cl_command_queue_properties queueFlags = CL_QUEUE_ON_DEVICE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
     size_t deviceID = 0;
+    setup.queues.resize(setup.devicesUsed.size());
     for (const auto device : setup.devicesUsed)
     {
         auto& deviceQueues = setup.queues[deviceID++];
+#ifdef DEBUG
+        const auto deviceName = device.getInfo<CL_DEVICE_NAME>();
+        LOG(V5_DEBG, "Device %u: %s\n", deviceID, deviceName.c_str());
+#endif
         for (const auto priority : info.queuePriorities)
         {
             if (priority != 1.0f)
