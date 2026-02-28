@@ -204,6 +204,9 @@ add_library(mallob_mgi STATIC "src/mgi/KernelLoader.cpp")
 target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_mgi PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_mgi mallob_corepluscomm)
+
+file(COPY "src/test/mgi_kernel" DESTINATION "./")
+file(COPY "src/mgi/MGIKernelDefs.hpp" DESTINATION "./mgi_kernel/mgi")
 endif()
 
 # Library of Mallob's CORE sources

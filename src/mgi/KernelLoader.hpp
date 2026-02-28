@@ -1,11 +1,12 @@
 #pragma once
 
 #include <string>
+#include "MGIUtil.hpp"
 
 namespace mgi {
-    struct Kernel {
-        size_t internal;
-    };
+    struct Kernel : public TypeHandle {};
+
+    struct OCLDeferredAPI;
 
 #ifdef MGI_API_OCL
     class KernelLoaderOCL {
@@ -13,7 +14,7 @@ namespace mgi {
     public:
         KernelLoaderOCL() = default;
 
-        Kernel loadKernel(const std::string& file);
+        Kernel loadKernel(OCLDeferredAPI* api, const std::string& file);
     };
 
     using KernelLoader = KernelLoaderOCL;

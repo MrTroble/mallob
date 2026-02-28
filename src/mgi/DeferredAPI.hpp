@@ -7,21 +7,6 @@
 
 namespace mgi {
 
-template<typename clType>
-struct Build {
-    clType value[33];
-    uint32_t current = 0;
-    
-    template<typename ValueType>
-    Build<clType>& with(int pKey, const ValueType pValue) {
-        value[current] = (clType) pKey;
-        value[current+1] = (clType) pValue;
-        current += 2;
-        value[current] = 0;
-        return *this;
-    }
-};
-
 struct InitInfo {
     std::vector<float> queuePriorities{1, 1.0f};
 };
@@ -33,13 +18,25 @@ struct OCLSetup {
     std::vector<std::vector<cl::CommandQueue>> queues;
 };
 
+struct KernelCache {
+
+};
+
 #ifdef MGI_API_OCL
+
 class OCLDeferredAPI {
     OCLSetup init;
     KernelLoaderOCL loader;
+    std::vector<cl::Program> programs;
 
+    friend class KernelLoaderOCL;
 public:
-    OCLDeferredAPI(const OCLSetup& init) : init(init) {}
+    OCLDeferredAPI(OCLSetup&& init) : init(std::move(init)) {}
+
+    Kernel loadKernel(const std::string& file, const KernelCache& cache = {}) {
+        // TODO Caching
+        return loader.loadKernel(this, file);
+    }
 };
 
 inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
@@ -77,6 +74,7 @@ inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
     const auto contextFlags = Build<cl_context_properties>().with(CL_CONTEXT_PLATFORM, platformID);
     setup.context = cl::Context(setup.devicesUsed, contextFlags.value);
 
+
     const cl_command_queue_properties queueFlags = CL_QUEUE_ON_DEVICE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
     size_t deviceID = 0;
     setup.queues.resize(setup.devicesUsed.size());
@@ -91,11 +89,10 @@ inline OCLDeferredAPI initMGI(const InitInfo& info = {}) {
         {
             if (priority != 1.0f)
                 LOG(V1_WARN, "Currently priorities other then 1.0f are unsupported\n");
-            cl::CommandQueue queue(setup.context, device, queueFlags);
-            deviceQueues.push_back(queue);
+            deviceQueues.emplace_back(setup.context, device, queueFlags);
         }
     }
-    return OCLDeferredAPI{setup};
+    return OCLDeferredAPI{std::move(setup)};
 }
 
 using DeferredAPI = OCLDeferredAPI;

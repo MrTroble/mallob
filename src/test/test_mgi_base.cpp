@@ -12,6 +12,8 @@ using namespace mgi;
 
 void testRoutine() {
     DeferredAPI deferred = initMGI();
+    Kernel kernel = deferred.loadKernel("mgi_kernel/test_kernel.cpp");
+    assert(kernel);
 }
 
 int main(int argc, char* argv[]) {
