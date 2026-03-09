@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <fstream>
 #include <util/logger.hpp>
+#include <string>
+#include <vector>
 
 namespace mgi
 {
@@ -27,7 +29,8 @@ namespace mgi
         inline ~OnExit() { call(); }
     };
 
-    inline std::string wholeFile(const std::string &path)
+    template<typename T>
+    inline T wholeFile(const std::string &path)
     {
         std::ifstream inputstream(path,
                                   std::ios::ate | std::ios::in | std::ios::binary);
@@ -38,7 +41,7 @@ namespace mgi
         }
         const size_t size = (size_t)inputstream.tellg();
         inputstream.seekg(0, std::ios_base::beg);
-        std::string fileData;
+        T fileData;
         fileData.resize(size);
         inputstream.read((char *)fileData.data(), size);
         return fileData;

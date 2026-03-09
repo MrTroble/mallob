@@ -172,7 +172,7 @@ publish_app_registry_changes()
 
 
 # GPU Enables MGI compilation
-if(MALLOB_USE_GPU)
+if(${MALLOB_USE_GPU})
 message("GPU Support enabled")
 
 include(FetchContent)
@@ -205,8 +205,22 @@ target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_mgi PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_mgi mallob_corepluscomm)
 
-file(COPY "src/test/mgi_kernel" DESTINATION "./")
-file(COPY "src/mgi/MGIKernelDefs.hpp" DESTINATION "./mgi_kernel/mgi")
+file(GLOB kernelfiles "src/mgi_kernel/*.*")
+
+if(NOT ${MALLOB_MGI_NO_TEST_COMPILE})
+foreach(file ${kernelfiles})
+  cmake_path(GET file FILENAME filename)
+  add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" COMMAND clang "-cl-std=clc++" "-I" "${CMAKE_BINARY_DIR}/mgi_kernel" "--target=spirv64" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
+  list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
+endforeach()
+add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
+add_dependencies(mallob_mgi shaderTarget)
+endif()
+
+foreach(file ${kernelfiles})
+file(COPY "${file}" DESTINATION "${CMAKE_BINARY_DIR}/mgi_kernel")
+endforeach()
+
 endif()
 
 # Library of Mallob's CORE sources
