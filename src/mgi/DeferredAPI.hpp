@@ -18,7 +18,23 @@ struct OCLSetup {
     std::vector<std::vector<cl::CommandQueue>> queues;
 };
 
-struct KernelCache {
+struct KernelCache {};
+
+struct Memory : TypeHandle {};
+
+enum class MemoryType {
+    Global, Uniform, DeviceLocal
+};
+
+struct AllocationInfo {
+    Extension extensions;
+    MemoryType type;
+    size_t size;
+    void* initialMemory = nullptr;
+    size_t initialSize = 0;
+};
+
+struct AllocationStrategy {
 
 };
 
@@ -36,6 +52,10 @@ public:
     Kernel loadKernel(const std::string& file, const KernelCache& cache = {}) {
         // TODO Caching
         return loader.loadKernel(this, file);
+    }
+
+    Memory allocate(span<AllocationInfo> info, const AllocationStrategy& allocation = {}) {
+        
     }
 };
 

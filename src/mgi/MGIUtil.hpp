@@ -18,6 +18,39 @@ namespace mgi
         }
     };
 
+
+    template<typename T>
+    struct MGISpan
+    {
+        T* begin = nullptr;
+        T* end = nullptr;
+
+        MGISpan();
+
+        template<typename G>
+        MGISpan(const G& holder) : begin(holder.data()), end(holder.data() + holder.size()) {}
+
+        size_t size() const {
+            return size_t(end - begin);
+        }
+
+        T* begin() const {
+            return begin;
+        }
+
+        T* end() const {
+            return end;
+        }
+    };
+    
+    template<typename T>
+    using span = MGISpan<T>;
+
+    struct Extension {
+        void* extension = nullptr;
+        size_t identiefier = 0;
+    };
+
     template <typename C>
     class OnExit
     {
