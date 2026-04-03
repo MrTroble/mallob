@@ -225,6 +225,7 @@ namespace mgi
         const auto extNames = usedPlatform.getInfo<CL_PLATFORM_EXTENSIONS>();
         LOG(V5_DEBG, "Extensions: %s\n", extNames.c_str());
 #endif
+
         setup.platform = usedPlatform;
 
         const cl_platform_id platformID = usedPlatform();

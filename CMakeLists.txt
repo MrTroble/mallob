@@ -187,6 +187,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(openclsdk)
 
+if(${MALLOB_MGI_OCL_LAYERS})
+    FetchContent_Declare(rapidxml
+      GIT_REPOSITORY         https://github.com/discord/rapidxml
+      GIT_SUBMODULES_RECURSE true
+      GIT_SHALLOW            true
+    )
+    FetchContent_Declare(
+      ocllayers
+      GIT_REPOSITORY         https://github.com/KhronosGroup/OpenCL-Layers
+      GIT_TAG                main
+      GIT_SUBMODULES_RECURSE true
+      GIT_SHALLOW            true
+    )
+    set(LAYERS_BUILD_TESTS true)
+    FetchContent_MakeAvailable(rapidxml)
+    set(RapidXml_DIR ${rapidxml_SOURCE_DIR})
+    FetchContent_MakeAvailable(ocllayers)
+endif()
+
 set(BASE_LIBS ${BASE_LIBS}
         OpenCL::Headers
         OpenCL::HeadersCpp
@@ -207,6 +226,7 @@ target_link_libraries(mallob_mgi mallob_corepluscomm)
 
 file(GLOB kernelfiles "src/mgi_kernel/*.*")
 
+# Test compile kernels
 if(NOT ${MALLOB_MGI_NO_TEST_COMPILE})
 foreach(file ${kernelfiles})
   cmake_path(GET file FILENAME filename)
