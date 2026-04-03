@@ -22,24 +22,28 @@ namespace mgi
     template<typename T>
     struct MGISpan
     {
-        T* begin = nullptr;
-        T* end = nullptr;
+        T* beginPtr = nullptr;
+        T* endPtr = nullptr;
 
         MGISpan();
 
         template<typename G>
-        MGISpan(const G& holder) : begin(holder.data()), end(holder.data() + holder.size()) {}
+        MGISpan(const G& holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
 
         size_t size() const {
-            return size_t(end - begin);
+            return size_t(endPtr - beginPtr);
         }
 
         T* begin() const {
-            return begin;
+            return beginPtr;
         }
 
         T* end() const {
-            return end;
+            return endPtr;
+        }
+
+        T& operator[](size_t index){
+            return beginPtr[index];
         }
     };
     
