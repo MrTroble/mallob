@@ -12,7 +12,7 @@ namespace mgi
 
     struct InitInfo
     {
-        std::vector<float> queuePriorities{1, 1.0f};
+        std::vector<float> queuePriorities{1.0f};
     };
 
     struct OCLSetup
@@ -55,7 +55,7 @@ namespace mgi
         Extension extensions;
         MemoryType type;
         size_t size;
-        void *initialMemory = nullptr;
+        const void *initialMemory = nullptr;
         size_t initialSize = 0;
     };
 
@@ -75,28 +75,13 @@ namespace mgi
     struct AllocationStrategy
     {
 
-        virtual ~AllocationStrategy();
+        virtual ~AllocationStrategy() {}
 
-        virtual std::vector<AllocationSlab> slabs(span<const AllocationInfo> infos) const
-        {
-            std::vector<AllocationSlab> sizeValues(infos.size());
-            std::transform(infos.begin(), infos.end(), sizeValues.begin(), [](const auto &value)
-                           { return {value.size, value.type}; });
-            return sizeValues;
-        }
+        virtual std::vector<AllocationSlab> slabs(span<const AllocationInfo> infos) const;
 
-        virtual bool needsSubBuffers(span<const AllocationInfo> infos) const
-        {
-            return false;
-        }
+        virtual bool needsSubBuffers(span<const AllocationInfo> infos) const;
 
-        virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos) const
-        {
-            std::vector<AllocationRegions> sizeValues(infos.size());
-            std::transform(infos.begin(), infos.end(), sizeValues.begin(), [i = 0u](const auto &value) mutable
-                           { return {0, value.size, i++}; });
-            return sizeValues;
-        }
+        virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos) const;
     };
 
 #ifdef MGI_API_OCL
@@ -158,20 +143,21 @@ namespace mgi
                 if (strategy.needsSubBuffers(infos))
                 {
                     const auto regions = strategy.regions(infos);
-                    subBuffers.reserve(infos.size());
+                    subBuffers.resize(infos.size());
                     for (size_t i = 0; i < infos.size(); i++)
                     {
                         const auto &info = infos[i];
                         const auto &region = regions[i];
                         cl_mem_flags flags = toOCLMemoryType(info.type);
-                        cl_buffer_region region{region.offset, region.size};
+                        cl_buffer_region buff_region{region.offset, region.size};
                         cl_int error = 0;
-                        clCreateSubBuffer(slabs[region.index], flags, CL_BUFFER_CREATE_TYPE_REGION, &region, &error);
+                        cl_mem subbuffer = clCreateSubBuffer(slabs[region.index], flags, CL_BUFFER_CREATE_TYPE_REGION, &buff_region, &error);
                         if (error != 0)
                         {
                             LOG(V0_CRIT, "Error: %u; Subbuffer creation failed with type %u\n", error, (uint32_t)info.type);
                             return {};
                         }
+                        subBuffers[i] = subbuffer;
                     }
                 }
                 else
@@ -186,7 +172,7 @@ namespace mgi
             for (size_t i = 0; i < infos.size(); i++)
             {
                 const auto &info = infos[i];
-                if(info.initialMemory == nullptr) continue;
+                if(info.initialMemory == nullptr || info.initialSize == 0) continue;
                 const auto buffer = subBuffers[i];
                 if(isWritable(info.type)) { // TODO: This can be segregated earlier for more performance
                     cl_event event;
@@ -196,6 +182,7 @@ namespace mgi
                     // TODO? MAP?
                 }             
             }
+            clWaitForEvents(events.size(), events.data());
             std::vector<Memory> memories(subBuffers.size());
             std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem) {return Memory{(size_t)mem};});
             return memories;

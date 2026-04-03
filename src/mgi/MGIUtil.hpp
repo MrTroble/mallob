@@ -12,7 +12,7 @@ namespace mgi
     {
         size_t internal = SIZE_MAX;
 
-        inline operator bool()
+        inline operator bool() const
         {
             return internal != SIZE_MAX;
         }
