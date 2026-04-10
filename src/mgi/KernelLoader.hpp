@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <util/assert.hpp>
 #include "MGIUtil.hpp"
 
 namespace mgi {

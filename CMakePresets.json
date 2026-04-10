@@ -8,6 +8,9 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
+      "environment": {
+        "OPENCL_LAYERS": "${sourceDir}/out/build/${presetName}/_deps/ocllayers-build/lib64/libCLParamVerificationLayer.so"
+      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "MALLOB_LOG_VERBOSITY": "5",

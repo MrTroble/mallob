@@ -232,7 +232,7 @@ namespace mgi
         const auto contextFlags = Build<cl_context_properties>().with(CL_CONTEXT_PLATFORM, platformID);
         setup.context = cl::Context(setup.devicesUsed, contextFlags.value);
 
-        const cl_command_queue_properties queueFlags = CL_QUEUE_ON_DEVICE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
+        const cl_command_queue_properties queueFlags = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
         size_t deviceID = 0;
         setup.queues.resize(setup.devicesUsed.size());
         for (const auto device : setup.devicesUsed)
@@ -247,7 +247,8 @@ namespace mgi
             {
                 if (priority != 1.0f)
                     LOG(V1_WARN, "Currently priorities other then 1.0f are unsupported\n");
-                deviceQueues.emplace_back(setup.context, device, queueFlags);
+                cl::CommandQueue queue(setup.context, device, queueFlags);
+                deviceQueues.emplace_back(std::move(queue));
             }
         }
         return OCLDeferredAPI{std::move(setup)};

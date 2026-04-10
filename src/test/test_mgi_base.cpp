@@ -18,6 +18,7 @@ void testRoutine() {
     const char testData[] = "HelloThisIsTestData!";
     constexpr size_t sizeOfTestData = sizeof(testData);
 
+    LOG(V2_INFO, "Starting Allocation Tests!\n");
     AllocationInfo globalAllocation = { {}, MemoryType::Global, 128};
     AllocationInfo globalWithInitalMemory = { {}, MemoryType::Global, sizeOfTestData, testData, sizeOfTestData };
     AllocationInfo deviceLocal = { {}, MemoryType::DeviceLocal, 128 };
@@ -27,6 +28,7 @@ void testRoutine() {
     for(const auto memory : memories) {
         assert(memory);
     }
+    LOG(V2_INFO, "Allocations finished!\n");
 }
 
 int main(int argc, char* argv[]) {

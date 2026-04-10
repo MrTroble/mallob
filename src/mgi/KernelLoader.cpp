@@ -23,17 +23,21 @@ namespace mgi
         std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram};
         std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp"};
         std::string compilerOptions = "-cl-std=CL2.0 -D MGI_API_OCL -I ./";
-#ifdef DEBUG
-        compilerOptions += " -cl-nv-verbose";
-#endif
+
         try
         {
             program.compile(compilerOptions, defaultIncludePrograms, defaultIncludeNames);
             for (auto& device : api->init.devicesUsed)
             {
                 const auto log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
-                LOG(V2_INFO, "Build successful with:\n");
-                LOG(V1_WARN, "%s", log.c_str());
+#ifdef DEBUG
+                if(log.empty()) {
+                    LOG(V2_INFO, "Build successful for %s!\n", file.c_str());
+                } else {
+                    LOG(V2_INFO, "Build successful for %s with:\n", file.c_str());
+                    LOG(V1_WARN, "%s\n", log.c_str());
+                }
+#endif
             }
         }
         catch (const cl::BuildError &error)
@@ -42,7 +46,7 @@ namespace mgi
             LOG(V0_CRIT, "Build failed with:\n");
             for (auto [device, line] : log)
             {
-                LOG(V0_CRIT, "%s", line.c_str());
+                LOG(V0_CRIT, "%s\n", line.c_str());
             }
             return {};
         }
