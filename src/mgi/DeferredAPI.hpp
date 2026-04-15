@@ -39,7 +39,8 @@ namespace mgi
         Constant     // Kernel read only
     };
 
-    inline bool isWritable(MemoryType type) {
+    inline bool isWritable(MemoryType type)
+    {
         switch (type)
         {
         case MemoryType::Uniform:
@@ -122,7 +123,7 @@ namespace mgi
         }
 
         std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
-        {               
+        {
             const auto slabsToAllocate = strategy.slabs(infos);
             std::vector<cl_mem> subBuffers;
             {
@@ -152,12 +153,7 @@ namespace mgi
                         cl_buffer_region buff_region{region.offset, region.size};
                         cl_int error = 0;
                         cl_mem subbuffer = clCreateSubBuffer(slabs[region.index], flags, CL_BUFFER_CREATE_TYPE_REGION, &buff_region, &error);
-                        if (error != 0)
-                        {
-                            LOG(V0_CRIT, "Error: %u; Subbuffer creation failed with type %u\n", error, (uint32_t)info.type);
-                            return {};
-                        }
-                        subBuffers[i] = subbuffer;
+                        MGI_ERROR_CHECK(error, "Subbuffer creation failed with type %u", return {}, (uint32_t)info.type)
                     }
                 }
                 else
@@ -169,22 +165,31 @@ namespace mgi
             cl_command_queue queue = init.queues.back().back().get();
             std::vector<cl_event> events;
             events.reserve(infos.size());
+            std::vector<cl_mem> buffersToUnmap;
+            buffersToUnmap.reserve(infos.size());
             for (size_t i = 0; i < infos.size(); i++)
             {
                 const auto &info = infos[i];
-                if(info.initialMemory == nullptr || info.initialSize == 0) continue;
+                if (info.initialMemory == nullptr || info.initialSize == 0)
+                    continue;
                 const auto buffer = subBuffers[i];
-                if(isWritable(info.type)) { // TODO: This can be segregated earlier for more performance
+                if (isWritable(info.type))
+                { // TODO: This can be segregated earlier for more performance
                     cl_event event;
                     clEnqueueWriteBuffer(queue, buffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &event);
                     events.push_back(event);
-                } else {
-                    // TODO? MAP?
-                }             
+                }
+                else
+                {
+                    cl_event event;
+                    cl_int error = CL_SUCCESS;
+                    clEnqueueMapBuffer(queue, buffer, false, CL_MAP_WRITE, 0, info.initialSize, 0, nullptr, &event, &error);
+                }
             }
-            clWaitForEvents(events.size(), events.data());
+            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Eventsfailed!");
             std::vector<Memory> memories(subBuffers.size());
-            std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem) {return Memory{(size_t)mem};});
+            std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem)
+                           { return Memory{(size_t)mem}; });
             return memories;
         }
     };

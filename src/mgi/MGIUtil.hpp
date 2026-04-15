@@ -6,6 +6,25 @@
 #include <string>
 #include <vector>
 
+// TODO: Use __VA_OPT__ here ... there is currently no statandart usage hear ... TO BAD!
+// Change for C++20
+#ifdef MGI_API_OCL
+#define MGI_ERROR_CHECK(value, text, func, ...)                                                      \
+    {                                                                                                \
+        const auto err = (value);                                                                    \
+        if (err != CL_SUCCESS)                                                                       \
+        {                                                                                            \
+            LOG(V0_CRIT, "[%s:%d] CL Error %s: " text "\n", __FILE__, __LINE__, err, ##__VA_ARGS__); \
+            func;                                                                                    \
+        }                                                                                            \
+    }
+#endif
+#ifdef DEBUG
+#define MGI_DB_CHECK(value, text, ...) MGI_ERROR_CHECK(value, text, ;, ##__VA_ARGS__)
+#else
+#define MGI_DB_CHECK(value, text, ...)
+#endif
+
 namespace mgi
 {
     struct TypeHandle
@@ -18,40 +37,44 @@ namespace mgi
         }
     };
 
-
-    template<typename T>
+    template <typename T>
     struct MGISpan
     {
-        T* beginPtr = nullptr;
-        T* endPtr = nullptr;
+        T *beginPtr = nullptr;
+        T *endPtr = nullptr;
 
         MGISpan();
 
-        template<typename G>
-        MGISpan(const G& holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
+        template <typename G>
+        MGISpan(const G &holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
 
-        size_t size() const {
+        size_t size() const
+        {
             return size_t(endPtr - beginPtr);
         }
 
-        T* begin() const {
+        T *begin() const
+        {
             return beginPtr;
         }
 
-        T* end() const {
+        T *end() const
+        {
             return endPtr;
         }
 
-        T& operator[](size_t index){
+        T &operator[](size_t index)
+        {
             return beginPtr[index];
         }
     };
-    
-    template<typename T>
+
+    template <typename T>
     using span = MGISpan<T>;
 
-    struct Extension {
-        void* extension = nullptr;
+    struct Extension
+    {
+        void *extension = nullptr;
         size_t identiefier = 0;
     };
 
@@ -66,7 +89,7 @@ namespace mgi
         inline ~OnExit() { call(); }
     };
 
-    template<typename T>
+    template <typename T>
     inline T wholeFile(const std::string &path)
     {
         std::ifstream inputstream(path,
