@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <mutex>
 
 #include "KernelLoader.hpp"
 #ifdef MGI_API_OCL
@@ -85,6 +86,16 @@ namespace mgi
         virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos) const;
     };
 
+    struct ReadInfo {
+        size_t size = SIZE_MAX; // WholeSize 
+        size_t offset = 0;
+    };
+
+    struct ReadLock {
+        std::unique_lock<std::mutex> lock;
+        std::vector<void*> ptr;
+    };
+
 #ifdef MGI_API_OCL
 
     inline cl_mem_flags toOCLMemoryType(MemoryType type)
@@ -112,6 +123,11 @@ namespace mgi
         std::vector<cl::Program> programs;
 
         friend class KernelLoaderOCL;
+
+        cl_command_queue selectQueue() {
+            // TODO make this device selection MPI dependent
+            return init.queues.back().back().get();
+        }
 
     public:
         OCLDeferredAPI(OCLSetup &&init) : init(std::move(init)) {}
@@ -161,11 +177,12 @@ namespace mgi
                     subBuffers = std::move(slabs);
                 }
             }
-            // TODO: Better queue and device selection
-            cl_command_queue queue = init.queues.back().back().get();
+
+            cl_command_queue queue = selectQueue();
             std::vector<cl_event> events;
+            mgi::OnExit raiiEventsHandle([&](){ for(auto event : events) clRetainEvent(event); });
             events.reserve(infos.size());
-            std::vector<cl_mem> buffersToUnmap;
+            std::vector<std::tuple<cl_mem, uint8_t*, uint8_t*, size_t>> buffersToUnmap;
             buffersToUnmap.reserve(infos.size());
             for (size_t i = 0; i < infos.size(); i++)
             {
@@ -175,22 +192,42 @@ namespace mgi
                 const auto buffer = subBuffers[i];
                 if (isWritable(info.type))
                 { // TODO: This can be segregated earlier for more performance
-                    cl_event event;
+                    cl_event event{};
                     clEnqueueWriteBuffer(queue, buffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &event);
                     events.push_back(event);
                 }
                 else
                 {
-                    cl_event event;
-                    cl_int error = CL_SUCCESS;
-                    clEnqueueMapBuffer(queue, buffer, false, CL_MAP_WRITE, 0, info.initialSize, 0, nullptr, &event, &error);
+                    cl_event event{};
+                    cl_int error{};
+                    auto hostBuffer = clEnqueueMapBuffer(queue, buffer, false, CL_MAP_WRITE, 0, info.initialSize, 0, nullptr, &event, &error);
+                    MGI_DB_CHECK(error, "Map enqueue failed!");
+                    buffersToUnmap.emplace_back(buffer, (uint8_t*)hostBuffer, (uint8_t*)info.initialMemory, info.initialSize);
+                    events.push_back(event);
                 }
             }
-            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Eventsfailed!");
+            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Events failed!");
+            for(auto event : events) clRetainEvent(event); 
+            events.clear();
+
+            for (auto [buffer, ptr, from, amount] : buffersToUnmap)
+            {
+                std::copy(from, from + amount, ptr);
+                cl_event event{};
+                MGI_DB_CHECK(clEnqueueUnmapMemObject(queue, buffer, ptr, 0, nullptr, &event), "Could not unmap buffer!");
+                events.push_back(event);
+            }
+            
             std::vector<Memory> memories(subBuffers.size());
             std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem)
                            { return Memory{(size_t)mem}; });
             return memories;
+        }
+
+        ReadLock readMemory(Memory memory, span<const ReadInfo> reads) {
+            cl_int error{};
+            const auto queue = selectQueue();
+            const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, );
         }
     };
 
