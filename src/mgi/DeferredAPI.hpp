@@ -28,8 +28,36 @@ namespace mgi
     {
     };
 
-    struct Memory : TypeHandle
+    struct Memory : public TypeHandle
     {
+    };
+    MGI_DEFINE_TYPE_HASH(mgi::Memory);
+
+    template<typename BaseMap>
+    struct ProtectedMap {
+        BaseMap map;
+        std::mutex mutex;
+
+        void insert(typename BaseMap::value_type&& value) {
+            std::lock_guard localGuard(mutex);
+            map.insert(std::forward(value));
+        }
+
+        template<typename InputIter>
+        void insert(InputIter first, InputIter last) {
+            std::lock_guard localGuard(mutex);
+            map.insert(first, last);
+        }
+
+        typename BaseMap::mapped_type& operator[](typename BaseMap::key_type&& key) {
+            std::lock_guard localGuard(mutex);
+            return map[key];
+        }
+
+        typename BaseMap::mapped_type& operator[](const typename BaseMap::key_type& key) {
+            std::lock_guard localGuard(mutex);
+            return map[key];
+        }
     };
 
     enum class MemoryType
@@ -121,6 +149,7 @@ namespace mgi
         OCLSetup init;
         KernelLoaderOCL loader;
         std::vector<cl::Program> programs;
+        ProtectedMap<std::unordered_map<Memory, MemoryType>> typesCreated;
 
         friend class KernelLoaderOCL;
 
@@ -184,12 +213,14 @@ namespace mgi
             events.reserve(infos.size());
             std::vector<std::tuple<cl_mem, uint8_t*, uint8_t*, size_t>> buffersToUnmap;
             buffersToUnmap.reserve(infos.size());
+            std::vector<std::pair<Memory, MemoryType>> typesToInsert;
             for (size_t i = 0; i < infos.size(); i++)
             {
                 const auto &info = infos[i];
                 if (info.initialMemory == nullptr || info.initialSize == 0)
                     continue;
                 const auto buffer = subBuffers[i];
+                typesToInsert.emplace_back(Memory{(size_t)buffer}, info.type);
                 if (isWritable(info.type))
                 { // TODO: This can be segregated earlier for more performance
                     cl_event event{};
@@ -217,7 +248,10 @@ namespace mgi
                 MGI_DB_CHECK(clEnqueueUnmapMemObject(queue, buffer, ptr, 0, nullptr, &event), "Could not unmap buffer!");
                 events.push_back(event);
             }
-            
+            if(!events.empty())
+                MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Unmap events failed!");
+
+            this->typesCreated.insert(typesToInsert.begin(), typesToInsert.end());
             std::vector<Memory> memories(subBuffers.size());
             std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem)
                            { return Memory{(size_t)mem}; });
@@ -227,7 +261,10 @@ namespace mgi
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads) {
             cl_int error{};
             const auto queue = selectQueue();
-            const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, );
+            if(isWritable(typesCreated[memory])) {
+
+            }
+            //const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, );
         }
     };
 

@@ -35,6 +35,11 @@ namespace mgi
         {
             return internal != SIZE_MAX;
         }
+
+        inline bool operator==(const TypeHandle other)
+        {
+            return other.internal == internal;
+        }
     };
 
     template <typename T>
@@ -125,3 +130,16 @@ namespace mgi
     };
 
 }
+
+// TODO THIS IS STUPID REMOVE WITH C++20 Conecpts
+#define MGI_DEFINE_TYPE_HASH(t1) }\
+namespace std\
+{   template<>\
+    struct hash<t1>\
+    {\
+        std::size_t operator()(const t1 &s) const noexcept\
+        {\
+            return std::hash<size_t>{}(s.internal);\
+        }\
+    };\
+} namespace mgi {
