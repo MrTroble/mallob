@@ -72,6 +72,10 @@ namespace mgi
         {
             return beginPtr[index];
         }
+
+        bool empty() {
+            return size() == 0;
+        }
     };
 
     template <typename T>

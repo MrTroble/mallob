@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <shared_mutex>
 
 #include "KernelLoader.hpp"
 #ifdef MGI_API_OCL
@@ -36,7 +37,7 @@ namespace mgi
     template<typename BaseMap>
     struct ProtectedMap {
         BaseMap map;
-        std::mutex mutex;
+        std::shared_mutex mutex;
 
         void insert(typename BaseMap::value_type&& value) {
             std::lock_guard localGuard(mutex);
@@ -50,12 +51,12 @@ namespace mgi
         }
 
         typename BaseMap::mapped_type& operator[](typename BaseMap::key_type&& key) {
-            std::lock_guard localGuard(mutex);
+            std::shared_lock localGuard(mutex);
             return map[key];
         }
 
         typename BaseMap::mapped_type& operator[](const typename BaseMap::key_type& key) {
-            std::lock_guard localGuard(mutex);
+            std::shared_lock localGuard(mutex);
             return map[key];
         }
     };
@@ -68,7 +69,7 @@ namespace mgi
         Constant     // Kernel read only
     };
 
-    inline bool isWritable(MemoryType type)
+    inline bool isHostWritable(MemoryType type)
     {
         switch (type)
         {
@@ -119,9 +120,23 @@ namespace mgi
         size_t offset = 0;
     };
 
+    typedef void(*ReadLockReleaseFunc)(std::vector<void*>&, void*);
+
+    static void __noop_func(std::vector<void*>&, void*) {}
+
     struct ReadLock {
-        std::unique_lock<std::mutex> lock;
+        ReadLockReleaseFunc releaseFunction = &__noop_func;
+        void* customData = nullptr;
+        std::unique_lock<std::shared_mutex> lock;
         std::vector<void*> ptr;
+
+        ReadLock() = default;
+        ReadLock(ReadLock&&) = default;
+        ReadLock(std::unique_lock<std::shared_mutex>&& lock) : lock(std::move(lock)) {}
+
+        ~ReadLock() {
+            releaseFunction(ptr, customData);
+        }
     };
 
 #ifdef MGI_API_OCL
@@ -144,12 +159,18 @@ namespace mgi
         }
     }
 
+    struct ClearReadDataGlobal {
+        cl_command_queue queue;
+        cl_mem memory;
+    };
+
     class OCLDeferredAPI
     {
         OCLSetup init;
         KernelLoaderOCL loader;
         std::vector<cl::Program> programs;
         ProtectedMap<std::unordered_map<Memory, MemoryType>> typesCreated;
+        ProtectedMap<std::unordered_map<Memory, std::shared_mutex*>> perMemoryMutex;
 
         friend class KernelLoaderOCL;
 
@@ -157,6 +178,26 @@ namespace mgi
             // TODO make this device selection MPI dependent
             return init.queues.back().back().get();
         }
+
+        static void clearGlobalReadLock(std::vector<void*>&ptr, void* queuePtr) {
+            if(ptr.empty()) return;
+            const auto& data = *((ClearReadDataGlobal*) queuePtr);
+            
+            std::vector<cl_event> events(ptr.size());
+            mgi::OnExit raiiEventsHandle([&](){ for(auto event : events) clRetainEvent(event); });
+            size_t index = 0;
+            for(const auto mapped : ptr) {
+                MGI_DB_CHECK(clEnqueueUnmapMemObject(data.queue, data.memory, mapped, 0, nullptr, events.data() + index++),
+                             "Could not unmap mem object!");
+            }
+            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Event wait failed!");
+            free(queuePtr);
+        }
+
+        static void clearCopyReadLock(std::vector<void*>&ptr, void* queuePtr) {
+            for(const auto alloc : ptr) free(alloc);
+        }
+
 
     public:
         OCLDeferredAPI(OCLSetup &&init) : init(std::move(init)) {}
@@ -179,11 +220,7 @@ namespace mgi
                     cl_mem_flags flags = toOCLMemoryType(slab.type);
                     cl_int error = 0;
                     cl_mem memory = clCreateBuffer(init.context.get(), flags, slab.size, nullptr, &error);
-                    if (error != 0)
-                    {
-                        LOG(V0_CRIT, "Error: %u; Slab creation failed for buffer with type %u\n", error, (uint32_t)slab.type);
-                        return {};
-                    }
+                    MGI_ERROR_CHECK(error, "Slab creation failed for buffer with type %u", return {}, (uint32_t)slab.type);
                     slabs.push_back(memory);
                 }
                 if (strategy.needsSubBuffers(infos))
@@ -221,10 +258,11 @@ namespace mgi
                     continue;
                 const auto buffer = subBuffers[i];
                 typesToInsert.emplace_back(Memory{(size_t)buffer}, info.type);
-                if (isWritable(info.type))
+                if (isHostWritable(info.type))
                 { // TODO: This can be segregated earlier for more performance
                     cl_event event{};
-                    clEnqueueWriteBuffer(queue, buffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &event);
+                    MGI_DB_CHECK(clEnqueueWriteBuffer(queue, buffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &event), 
+                                 "Could not enqueue write on allocate!");
                     events.push_back(event);
                 }
                 else
@@ -232,7 +270,7 @@ namespace mgi
                     cl_event event{};
                     cl_int error{};
                     auto hostBuffer = clEnqueueMapBuffer(queue, buffer, false, CL_MAP_WRITE, 0, info.initialSize, 0, nullptr, &event, &error);
-                    MGI_DB_CHECK(error, "Map enqueue failed!");
+                    MGI_DB_CHECK(error, "Map enqueue failed on allocate!");
                     buffersToUnmap.emplace_back(buffer, (uint8_t*)hostBuffer, (uint8_t*)info.initialMemory, info.initialSize);
                     events.push_back(event);
                 }
@@ -252,6 +290,15 @@ namespace mgi
                 MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Unmap events failed!");
 
             this->typesCreated.insert(typesToInsert.begin(), typesToInsert.end());
+            std::vector<std::pair<Memory, std::shared_mutex*>> mutexArray(subBuffers.size());
+            size_t index = 0;
+            for(auto &[mem, mutexPtr] : mutexArray) {
+                mem = Memory{(size_t)subBuffers[index]};
+                mutexPtr = new std::shared_mutex;
+                index++;
+            }
+            this->perMemoryMutex.insert(mutexArray.begin(), mutexArray.end());
+
             std::vector<Memory> memories(subBuffers.size());
             std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem)
                            { return Memory{(size_t)mem}; });
@@ -259,12 +306,42 @@ namespace mgi
         }
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads) {
+            assert(!reads.empty());
+            ReadLock readLock(std::unique_lock(*this->perMemoryMutex[memory]));
+            readLock.ptr.reserve(reads.size());
             cl_int error{};
             const auto queue = selectQueue();
-            if(isWritable(typesCreated[memory])) {
+            std::vector<cl_event> events(reads.size());
+            size_t index = 0;
+            if(isHostWritable(typesCreated[memory])) {
 
+                // This is shit, have locally cached versions
+                auto clearData = (ClearReadDataGlobal*)malloc(sizeof(ClearReadDataGlobal));
+                clearData->queue = queue;
+                clearData->memory = (cl_mem)memory.internal;
+                readLock.customData = clearData;
+                readLock.releaseFunction = &clearGlobalReadLock;
+                for (const auto& info : reads)
+                {
+                    cl_int error{};
+                    const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, info.offset, info.size, 
+                        0, nullptr, events.data() + index++, &error);
+                    MGI_ERROR_CHECK(error, "Could not map global at offset %u with size %u", return {},
+                                    info.offset, info.size);
+                    readLock.ptr.push_back(ptr);
+                }
+            } else {
+                readLock.releaseFunction = &clearCopyReadLock;
+                for (const auto& info : reads)
+                {
+                    void* ptr = malloc(info.size); // Well to bad use malloc here!
+                    MGI_ERROR_CHECK(clEnqueueReadBuffer(queue, (cl_mem)memory.internal, true, info.offset, info.size, ptr, 0, nullptr, events.data() + index++),
+                            "Could not read (copy to host) from GPU", return {});
+                    readLock.ptr.push_back(ptr);
+                }
             }
-            //const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, );
+            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait event failed!");
+            return readLock;
         }
     };
 

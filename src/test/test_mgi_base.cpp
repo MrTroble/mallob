@@ -23,12 +23,25 @@ void testRoutine() {
     AllocationInfo globalWithInitalMemory = { {}, MemoryType::Global, sizeOfTestData, testData, sizeOfTestData };
     AllocationInfo deviceLocal = { {}, MemoryType::DeviceLocal, 128 };
     AllocationInfo deviceLocalWithInitalMemory = { {}, MemoryType::DeviceLocal, sizeOfTestData, testData, sizeOfTestData };
-    std::vector<AllocationInfo> infos{globalAllocation, globalWithInitalMemory, deviceLocal};
+    std::vector<AllocationInfo> infos{globalAllocation, globalWithInitalMemory, deviceLocal, deviceLocalWithInitalMemory};
     const auto memories = deferred.allocate(infos);
     for(const auto memory : memories) {
         assert(memory);
     }
     LOG(V2_INFO, "Allocations finished!\n");
+    LOG(V2_INFO, "Start Read Testing finished!\n");
+    std::vector<ReadInfo> readInfos = { ReadInfo{sizeOfTestData} };
+    {
+        const auto readData = deferred.readMemory(memories[1], readInfos);
+        LOG(V2_INFO, "Read Global: %s\n", (const char*)readData.ptr[0]);
+        assert(strcmp((const char*)readData.ptr[0], testData) == 0);
+    }
+    {
+        const auto readData = deferred.readMemory(memories[3], readInfos);
+        LOG(V2_INFO, "Read Device Local: %s\n", (const char*)readData.ptr[0]);
+        assert(strcmp((const char*)readData.ptr[0], testData) == 0);
+    }
+    LOG(V2_INFO, "Read finished!\n");
 }
 
 int main(int argc, char* argv[]) {
