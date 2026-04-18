@@ -201,7 +201,7 @@ namespace mgi
         }
 
         static void clearCopyReadLock(std::vector<void*>&ptr, void* queuePtr) {
-            if(queuePtr == nullptr) return;
+            if(queuePtr == nullptr || ptr.empty()) return;
             const auto& data = *((ClearReadDataCopy*) queuePtr);
             clRetainMemObject(data.stagingBuffer);
             free(queuePtr);
@@ -358,10 +358,6 @@ namespace mgi
                 auto clearData = (ClearReadDataCopy*)malloc(sizeof(ClearReadDataCopy));
                 clearData->stagingBuffer = stagingBuffer;
                 readLock.customData = clearData;
-
-                cl_event mapEvent{};
-                const auto ptr = clEnqueueMapBuffer(queue, stagingBuffer, false, CL_MAP_READ, 0, slabAllocated, 0, nullptr, &mapEvent, &error);
-                MGI_DB_CHECK(error, "Could not map staging buffer for read!");
  
                 for (size_t i = 0; i < reads.size(); i++)
                 {
@@ -369,7 +365,14 @@ namespace mgi
                     const auto offset = beginOffset[i];
                     MGI_ERROR_CHECK(clEnqueueCopyBuffer(queue, (cl_mem)memory.internal, stagingBuffer, info.offset, offset, info.size, 0, nullptr, events.data() + i),
                                     "Copy to staging for read failed!", {free(clearData); return {};});
-                    readLock.ptr.push_back((uint8_t*)ptr + offset);
+                }
+                cl_event mapEvent{};
+                const auto ptr = clEnqueueMapBuffer(queue, stagingBuffer, true, CL_MAP_READ, 0, slabAllocated, events.size(), events.data(), 
+                            &mapEvent, &error);
+                MGI_DB_CHECK(error, "Could not map staging buffer for read!");
+                for (size_t i = 0; i < reads.size(); i++)
+                {       
+                    readLock.ptr.push_back((uint8_t*)ptr + beginOffset[i]);
                 }
                 MGI_DB_CHECK(clWaitForEvents(1, &mapEvent), "Wait event failed!");
             }
