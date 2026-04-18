@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <mutex>
 #include <shared_mutex>
+#include <numeric>
 
 #include "KernelLoader.hpp"
 #ifdef MGI_API_OCL
@@ -127,12 +128,12 @@ namespace mgi
     struct ReadLock {
         ReadLockReleaseFunc releaseFunction = &__noop_func;
         void* customData = nullptr;
-        std::unique_lock<std::shared_mutex> lock;
+        std::shared_lock<std::shared_mutex> lock;
         std::vector<void*> ptr;
 
         ReadLock() = default;
         ReadLock(ReadLock&&) = default;
-        ReadLock(std::unique_lock<std::shared_mutex>&& lock) : lock(std::move(lock)) {}
+        ReadLock(std::shared_lock<std::shared_mutex>&& lock) : lock(std::move(lock)) {}
 
         ~ReadLock() {
             releaseFunction(ptr, customData);
@@ -164,6 +165,10 @@ namespace mgi
         cl_mem memory;
     };
 
+    struct ClearReadDataCopy {
+        cl_mem stagingBuffer;
+    };
+
     class OCLDeferredAPI
     {
         OCLSetup init;
@@ -180,9 +185,10 @@ namespace mgi
         }
 
         static void clearGlobalReadLock(std::vector<void*>&ptr, void* queuePtr) {
+            if(queuePtr == nullptr) return;
             if(ptr.empty()) return;
             const auto& data = *((ClearReadDataGlobal*) queuePtr);
-            
+
             std::vector<cl_event> events(ptr.size());
             mgi::OnExit raiiEventsHandle([&](){ for(auto event : events) clRetainEvent(event); });
             size_t index = 0;
@@ -195,7 +201,10 @@ namespace mgi
         }
 
         static void clearCopyReadLock(std::vector<void*>&ptr, void* queuePtr) {
-            for(const auto alloc : ptr) free(alloc);
+            if(queuePtr == nullptr) return;
+            const auto& data = *((ClearReadDataCopy*) queuePtr);
+            clRetainMemObject(data.stagingBuffer);
+            free(queuePtr);
         }
 
 
@@ -248,8 +257,9 @@ namespace mgi
             std::vector<cl_event> events;
             mgi::OnExit raiiEventsHandle([&](){ for(auto event : events) clRetainEvent(event); });
             events.reserve(infos.size());
-            std::vector<std::tuple<cl_mem, uint8_t*, uint8_t*, size_t>> buffersToUnmap;
-            buffersToUnmap.reserve(infos.size());
+            std::vector<cl_mem> buffersToRetain;
+            buffersToRetain.reserve(infos.size());
+            OnExit stagingBuffersRetain([&](){ for(const auto stager : buffersToRetain) clRetainMemObject(stager);});
             std::vector<std::pair<Memory, MemoryType>> typesToInsert;
             for (size_t i = 0; i < infos.size(); i++)
             {
@@ -267,27 +277,25 @@ namespace mgi
                 }
                 else
                 {
-                    cl_event event{};
+                    // TODO Enable staging caches
                     cl_int error{};
-                    auto hostBuffer = clEnqueueMapBuffer(queue, buffer, false, CL_MAP_WRITE, 0, info.initialSize, 0, nullptr, &event, &error);
-                    MGI_DB_CHECK(error, "Map enqueue failed on allocate!");
-                    buffersToUnmap.emplace_back(buffer, (uint8_t*)hostBuffer, (uint8_t*)info.initialMemory, info.initialSize);
+                    const auto stagingBuffer = clCreateBuffer(init.context.get(), toOCLMemoryType(MemoryType::Global), info.initialSize, nullptr, &error);
+                    MGI_DB_CHECK(error, "Failed to create staging buffer!");
+                    buffersToRetain.push_back(stagingBuffer);
+
+                    cl_event writeToStagingEvent{};
+                    MGI_DB_CHECK(clEnqueueWriteBuffer(queue, stagingBuffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &writeToStagingEvent), 
+                                 "Could not enqueue write on allocate!");
+
+                    cl_event event{};
+                    MGI_DB_CHECK(clEnqueueCopyBuffer(queue, stagingBuffer, buffer, 0, 0, info.size , 1, &writeToStagingEvent, &event), 
+                                 "Copy buffer in allocation failed!");
                     events.push_back(event);
                 }
             }
             MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Events failed!");
             for(auto event : events) clRetainEvent(event); 
             events.clear();
-
-            for (auto [buffer, ptr, from, amount] : buffersToUnmap)
-            {
-                std::copy(from, from + amount, ptr);
-                cl_event event{};
-                MGI_DB_CHECK(clEnqueueUnmapMemObject(queue, buffer, ptr, 0, nullptr, &event), "Could not unmap buffer!");
-                events.push_back(event);
-            }
-            if(!events.empty())
-                MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Unmap events failed!");
 
             this->typesCreated.insert(typesToInsert.begin(), typesToInsert.end());
             std::vector<std::pair<Memory, std::shared_mutex*>> mutexArray(subBuffers.size());
@@ -307,14 +315,13 @@ namespace mgi
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads) {
             assert(!reads.empty());
-            ReadLock readLock(std::unique_lock(*this->perMemoryMutex[memory]));
+            ReadLock readLock(std::shared_lock(*this->perMemoryMutex[memory]));
             readLock.ptr.reserve(reads.size());
             cl_int error{};
             const auto queue = selectQueue();
             std::vector<cl_event> events(reads.size());
-            size_t index = 0;
             if(isHostWritable(typesCreated[memory])) {
-
+                size_t index = 0;
                 // This is shit, have locally cached versions
                 auto clearData = (ClearReadDataGlobal*)malloc(sizeof(ClearReadDataGlobal));
                 clearData->queue = queue;
@@ -324,7 +331,7 @@ namespace mgi
                 for (const auto& info : reads)
                 {
                     cl_int error{};
-                    const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, true, CL_MAP_READ, info.offset, info.size, 
+                    const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, false, CL_MAP_READ, info.offset, info.size, 
                         0, nullptr, events.data() + index++, &error);
                     MGI_ERROR_CHECK(error, "Could not map global at offset %u with size %u", return {},
                                     info.offset, info.size);
@@ -332,13 +339,39 @@ namespace mgi
                 }
             } else {
                 readLock.releaseFunction = &clearCopyReadLock;
-                for (const auto& info : reads)
+                std::vector<size_t> beginOffset(reads.size());
+                size_t slabAllocated = 0;
+                static constexpr size_t ALIGNMENT = 64; // TODO Revisit
+                for (size_t i = 0; i < reads.size(); i++)
                 {
-                    void* ptr = malloc(info.size); // Well to bad use malloc here!
-                    MGI_ERROR_CHECK(clEnqueueReadBuffer(queue, (cl_mem)memory.internal, true, info.offset, info.size, ptr, 0, nullptr, events.data() + index++),
-                            "Could not read (copy to host) from GPU", return {});
-                    readLock.ptr.push_back(ptr);
+                    size_t oldSize = reads[i].size;
+                    // Alignment
+                    oldSize += ALIGNMENT - (oldSize % ALIGNMENT);
+                    beginOffset[i] = slabAllocated;
+                    slabAllocated += oldSize;
                 }
+
+                cl_int error{}; // TODO Use cached staging if possible or requested
+                const auto stagingBuffer = clCreateBuffer(init.context.get(), toOCLMemoryType(MemoryType::Global), slabAllocated, nullptr, &error);
+                MGI_ERROR_CHECK(error, "Could not create staging buffer!", return {});
+
+                auto clearData = (ClearReadDataCopy*)malloc(sizeof(ClearReadDataCopy));
+                clearData->stagingBuffer = stagingBuffer;
+                readLock.customData = clearData;
+
+                cl_event mapEvent{};
+                const auto ptr = clEnqueueMapBuffer(queue, stagingBuffer, false, CL_MAP_READ, 0, slabAllocated, 0, nullptr, &mapEvent, &error);
+                MGI_DB_CHECK(error, "Could not map staging buffer for read!");
+ 
+                for (size_t i = 0; i < reads.size(); i++)
+                {
+                    const auto& info = reads[i];
+                    const auto offset = beginOffset[i];
+                    MGI_ERROR_CHECK(clEnqueueCopyBuffer(queue, (cl_mem)memory.internal, stagingBuffer, info.offset, offset, info.size, 0, nullptr, events.data() + i),
+                                    "Copy to staging for read failed!", {free(clearData); return {};});
+                    readLock.ptr.push_back((uint8_t*)ptr + offset);
+                }
+                MGI_DB_CHECK(clWaitForEvents(1, &mapEvent), "Wait event failed!");
             }
             MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait event failed!");
             return readLock;

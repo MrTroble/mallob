@@ -14,13 +14,13 @@
         const auto err = (value);                                                                    \
         if (err != CL_SUCCESS)                                                                       \
         {                                                                                            \
-            LOG(V0_CRIT, "[%s:%d] CL Error %s: " text "\n", __FILE__, __LINE__, err, ##__VA_ARGS__); \
+            LOG(V0_CRIT, "[%s:%d] CL Error %d: " text "\n", __FILE__, __LINE__, err, ##__VA_ARGS__); \
             func;                                                                                    \
         }                                                                                            \
     }
 #endif
 #ifdef DEBUG
-#define MGI_DB_CHECK(value, text, ...) MGI_ERROR_CHECK(value, text, ;, ##__VA_ARGS__)
+#define MGI_DB_CHECK(value, text, ...) MGI_ERROR_CHECK(value, text, assert(false);, ##__VA_ARGS__)
 #else
 #define MGI_DB_CHECK(value, text, ...)
 #endif
@@ -75,6 +75,10 @@ namespace mgi
 
         bool empty() {
             return size() == 0;
+        }
+
+        T& back() {
+            return *(end() - 1);
         }
     };
 
