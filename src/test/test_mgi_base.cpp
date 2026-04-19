@@ -29,7 +29,7 @@ void testRoutine() {
         assert(memory);
     }
     LOG(V2_INFO, "Allocations finished!\n");
-    LOG(V2_INFO, "Start Read Testing finished!\n");
+    LOG(V2_INFO, "Start Read Testing!\n");
     std::vector<ReadInfo> readInfos = { ReadInfo{sizeOfTestData} };
     {
         const auto readData = deferred.readMemory(memories[1], readInfos);
@@ -42,6 +42,25 @@ void testRoutine() {
         assert(strcmp((const char*)readData.ptr[0], testData) == 0);
     }
     LOG(V2_INFO, "Read finished!\n");
+
+    LOG(V2_INFO, "Start Task Testing!\n");
+    std::vector<uint32_t> values(64);
+    std::iota(values.begin(), values.end(), 0u);
+    std::vector taskTestAllocs = {AllocationInfo::from<uint32_t>(MemoryType::DeviceLocal, values)};
+    const auto taskMems = deferred.allocate(taskTestAllocs);
+    TaskInfo taskInfo{{}, TaskType::Long, {64, 1, 1}, kernel, "test", taskMems};
+    std::array taskInfos = {taskInfo};
+    const auto status = deferred.queueWaitTasks(taskInfos);
+    {
+        std::array readsIn = {ReadInfo{ values.size() * sizeof(uint32_t) }};
+        const auto readData = deferred.readMemory(taskMems[0], readsIn);
+        for (size_t i = 0; i < values.size(); i++)
+        {
+            const auto shaderValue = ((uint32_t*)readData.ptr[0])[i];
+            assert(shaderValue == i*2);
+        }
+    }
+    LOG(V2_INFO, "Kernel Tasks finished!\n");
 }
 
 int main(int argc, char* argv[]) {

@@ -39,6 +39,7 @@ namespace mgi
                 }
 #endif
             }
+            program = cl::linkProgram({program}, "");
         }
         catch (const cl::BuildError &error)
         {

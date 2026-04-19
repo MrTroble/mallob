@@ -63,6 +63,12 @@ namespace mgi
             return beginPtr;
         }
 
+        T *data() const
+        {
+            return beginPtr;
+        }
+
+
         T *end() const
         {
             return endPtr;
@@ -79,6 +85,10 @@ namespace mgi
 
         T& back() {
             return *(end() - 1);
+        }
+
+        size_t size_bytes() {
+            return size() * sizeof(T);
         }
     };
 
