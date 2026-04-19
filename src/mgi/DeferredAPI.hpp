@@ -140,6 +140,35 @@ namespace mgi
         }
     };
 
+    using MemoryDescriptor = std::vector<Memory>;
+
+    struct Task : public TypeHandle
+    {
+    };
+    MGI_DEFINE_TYPE_HASH(mgi::Task);
+
+    enum class TaskType : uint32_t {
+        Burst,
+        Long
+    };
+
+    enum class TaskStrategyType : uint32_t{
+        OutOfOrder, Lockstep
+    };
+
+    struct TaskStrategy {
+        TaskStrategyType type = TaskStrategyType::OutOfOrder;
+    };
+
+    struct TaskInfo {
+        Extension extensions;
+        Kernel kernel;
+        std::string function;
+        MemoryDescriptor descriptor;
+        TaskType type;
+        uint32_t range[3];
+    }
+
 #ifdef MGI_API_OCL
 
     inline cl_mem_flags toOCLMemoryType(MemoryType type)
@@ -378,6 +407,10 @@ namespace mgi
             }
             MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait event failed!");
             return readLock;
+        }
+    
+        std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy& = {}) {
+            
         }
     };
 
