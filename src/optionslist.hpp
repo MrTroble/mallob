@@ -28,6 +28,7 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(help,                           "h", "help",                                 false,                   "Print help and exit")
  OPT_STRING(monoFilename,                 "mono", "",                                  "",                      "Mono instance: Solve the provided CNF instance with full power, then exit") //[[AUTOCOMPLETE_FILE]]
  OPT_STRING(monoApplication,              "mono-app", "mono-application",              "SAT",                   "Application assumed for mono mode")
+ OPT_INT(monoIncrements,                "mono-incs", "mono-increments", 0, 0, MAX_INT, "Whether the \"mono\" job should be considered incremental")
  OPT_INT(numJobs,                         "J", "jobs",                                 0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed (set to 1 if -mono is used)")
  OPT_INT(numSuccessfulJobs,               "SJ", "successful-jobs",                     0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed SUCCESSFULLY (i.e., not cancelled / aborted)")
  OPT_INT(seed,                            "seed", "",                                  0,    0, MAX_INT,        "Random seed")
@@ -100,7 +101,7 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",                      0,    0, LARGE_INT,      "Timeout an instance after x cpu seconds")
  OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
  OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
- OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,
+ OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  0,    0, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,
     "Number of application worker threads per MPI process; maximum value configurable at compile time via -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS")
  OPT_BOOL(aggressiveDescriptionCaching, "adc", "aggressive-desc-caching", false, "Try to reuse cached job descriptions by only transferring them when not repairable without them")
  OPT_BOOL(crossJobCommunication, "cjc", "cross-job-communication", false, "Enable communication across jobs, such as cross-problem clause sharing, within user-specified job groups")

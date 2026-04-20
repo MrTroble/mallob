@@ -4,7 +4,7 @@
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
-#include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "app/satwithpre/options.hpp"
 #include "app/satwithpre/sat_preprocessor.hpp"
 #include "comm/mympi.hpp"
 #include "data/job_description.hpp"
@@ -15,16 +15,14 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
-#include "app/sat/solvers/kissat.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
-#include <memory>
 
 class SatPreprocessSolver {
 
 private:
-    const Parameters& _params; // configuration, cmd line arguments
+    const Parameters _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
 
@@ -144,6 +142,8 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+        if (_params.overrideSatOptions())
+            json["configuration"]["options"] = SATWITHPRE_OPT_OVERRIDES;
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -176,7 +176,7 @@ private:
         // We want the job to retract over sqrt(p) rounds
         // with a total duration of the job's wallclock time so far.
         float totalRetractionDuration;
-        if (_params.preprocessBalancing() == 0) {
+        if (_params.preprocessBalancing() == 0 || MyMpi::size(MPI_COMM_WORLD) == 1) {
             // drop original immediately
             totalRetractionDuration = 0.001;
             _time_of_retraction_end = _time_of_retraction_start;
@@ -190,7 +190,7 @@ private:
         if (currentSize > 100'000'000 && preprocessedSize/(double)currentSize < 0.75)
             totalRetractionDuration = 0.001;
         _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
-        if (_params.preprocessBalancing() == 1) {
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1) {
             LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
             _time_of_retraction_end = _time_of_retraction_start + 1.1f * totalRetractionDuration;
         }
@@ -203,17 +203,19 @@ private:
             {"priority", _params.preprocessJobPriority()},
             {"application", "SAT"},
         };
-        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
+        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(fPre));
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbVars);
         json["configuration"]["__NC"] = std::to_string(nbClauses);
-        if (_params.preprocessBalancing() == 1)
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1)
             json["configuration"]["__growprd"] = std::to_string(_retraction_round_duration);
         if (_desc.getWallclockLimit() > 0)
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+        if (_params.overrideSatOptions())
+            json["configuration"]["options"] = SATWITHPRE_OPT_OVERRIDES;
 
         // Obtain API and submit the job
         auto copiedJson = json;
