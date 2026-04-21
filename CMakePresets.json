@@ -6,10 +6,10 @@
       "displayName": "WSL Linux Debug",
       "description": "Target the Windows Subsystem for Linux (WSL) or a remote system.",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
       "environment": {
-        "OPENCL_LAYERS": "${sourceDir}/out/build/${presetName}/_deps/ocllayers-build/lib64/libCLParamVerificationLayer.so"
+        "OPENCL_LAYERS": "${sourceDir}/build/${presetName}/_deps/ocllayers-build/lib64/libCLParamVerificationLayer.so"
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
