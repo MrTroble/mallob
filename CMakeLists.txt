@@ -228,16 +228,17 @@ if(${MALLOB_MGI_OCL_LAYERS})
       GIT_SHALLOW            true
     )
 
-    # Work around for non conformant C code in header 
-    # See for reference https://github.com/fmtlib/fmt/issues/2059
-    # And `__STRICT_ANSI__` in https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-std=gnu++17)
-    endif()
     set(LAYERS_BUILD_TESTS true)
     FetchContent_MakeAvailable(rapidxml)
     set(RapidXml_DIR ${rapidxml_SOURCE_DIR})
     FetchContent_MakeAvailable(ocllayers)
+    
+    # Work around for non conformant C code in header 
+    # See for reference https://github.com/fmtlib/fmt/issues/2059
+    # And `__STRICT_ANSI__` in https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(LayersCommon INTERFACE -std=gnu++17)
+    endif()
 
 endif()
 

@@ -563,7 +563,7 @@ namespace mgi
         const cl_command_queue_properties queueFlags = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
         size_t deviceID = 0;
         setup.queues.resize(setup.devicesUsed.size());
-        for (const auto device : setup.devicesUsed)
+        for (const auto& device : setup.devicesUsed)
         {
             auto &deviceQueues = setup.queues[deviceID++];
 #ifdef DEBUG
