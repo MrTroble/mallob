@@ -44,26 +44,41 @@ namespace mgi
         void insert(typename BaseMap::value_type &&value)
         {
             std::lock_guard localGuard(mutex);
-            map.insert(std::forward(value));
+            const auto eval = map.insert(std::forward(value));
+            #ifdef DEBUG
+            assert(eval.second);
+            #endif
         }
 
         template <typename InputIter>
         void insert(InputIter first, InputIter last)
         {
             std::lock_guard localGuard(mutex);
+            #ifdef DEBUG
+            for (auto i = first; i != last; i++)
+            {
+                const auto eval = map.insert(*i);
+al                 assert(eval.second);
+            }
+            #else
             map.insert(first, last);
+            #endif
         }
 
-        const typename BaseMap::mapped_type &operator[](typename BaseMap::key_type &&key) const
+        const typename BaseMap::mapped_type operator[](typename BaseMap::key_type &&key) const
         {
             std::shared_lock localGuard(mutex);
-            return map.find(key)->second;
+            const auto iter = map.find(key);
+            assert(iter != std::end(map));
+            return iter->second;
         }
 
-        const typename BaseMap::mapped_type &operator[](const typename BaseMap::key_type &key) const
+        const typename BaseMap::mapped_type operator[](const typename BaseMap::key_type &key) const
         {
             std::shared_lock localGuard(mutex);
-            return map.find(key)->second;
+            const auto iter = map.find(key);
+            assert(iter != std::end(map));
+            return iter->second;
         }
     };
 
@@ -389,7 +404,6 @@ namespace mgi
                 clRetainEvent(event);
             events.clear();
 
-            this->typesCreated.insert(typesToInsert.begin(), typesToInsert.end());
             std::vector<std::pair<Memory, std::shared_mutex *>> mutexArray(subBuffers.size());
             size_t index = 0;
             for (auto &[mem, mutexPtr] : mutexArray)
@@ -399,6 +413,7 @@ namespace mgi
                 index++;
             }
             this->perMemoryMutex.insert(mutexArray.begin(), mutexArray.end());
+            this->typesCreated.insert(typesToInsert.begin(), typesToInsert.end());
 
             std::vector<Memory> memories(subBuffers.size());
             std::transform(subBuffers.begin(), subBuffers.end(), memories.begin(), [](cl_mem mem)
@@ -428,7 +443,8 @@ namespace mgi
                     cl_int error{};
                     const auto ptr = clEnqueueMapBuffer(queue, (cl_mem)memory.internal, false, CL_MAP_READ, info.offset, info.size,
                                                         0, nullptr, events.data() + index++, &error);
-                    MGI_ERROR_CHECK(error, "Could not map global at offset %u with size %u", return {},
+                    MGI_ERROR_CHECK(error, "Could not map global at offset %u with size %u", 
+                                    return {},
                                     info.offset, info.size);
                     readLock.ptr.push_back(ptr);
                 }

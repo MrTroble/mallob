@@ -220,9 +220,10 @@ if(${MALLOB_MGI_OCL_LAYERS})
       GIT_SUBMODULES_RECURSE true
       GIT_SHALLOW            true
     )
+    # Switch to own fork to fix issues :(
     FetchContent_Declare(
       ocllayers
-      GIT_REPOSITORY         https://github.com/KhronosGroup/OpenCL-Layers
+      GIT_REPOSITORY         https://github.com/MrTroble/OpenCL-Layers
       GIT_TAG                main
       GIT_SUBMODULES_RECURSE true
       GIT_SHALLOW            true
