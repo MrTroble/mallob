@@ -37,8 +37,8 @@ namespace mgi
             return internal != SIZE_MAX;
         }
 
-        template<typename T>
-        inline bool operator==(const T& other)
+        template <typename T>
+        inline bool operator==(const T &other)
         {
             return other.internal == internal;
         }
@@ -154,18 +154,20 @@ namespace mgi
 }
 
 // TODO THIS IS STUPID REMOVE WITH C++20 Conecpts
-#define MGI_DEFINE_TYPE_HASH(t1)                               \
-    }                                                          \
-    namespace std                                              \
-    {                                                          \
-        template <>                                            \
-        struct hash<t1>                                        \
-        {                                                      \
-            std::size_t operator()(const t1 &s) const noexcept \
-            {                                                  \
-                return std::hash<size_t>{}(s.internal);        \
-            }                                                  \
-        };                                                     \
-    }                                                          \
-    namespace mgi                                              \
+// THIS IS DOUBLE STUPID BC WE NEED TO SEPERATLY DEFINE == FOR EACH NO TEMPLATE SUPPORT!
+#define MGI_DEFINE_TYPE_HASH(t1)                                                              \
+    }                                                                                         \
+    inline bool operator==(const t1 &f1, const t1 &f2) { return f1.internal == f1.internal; } \
+    namespace std                                                                             \
+    {                                                                                         \
+        template <>                                                                           \
+        struct hash<t1>                                                                       \
+        {                                                                                     \
+            std::size_t operator()(const t1 &s) const noexcept                                \
+            {                                                                                 \
+                return std::hash<size_t>{}(s.internal);                                       \
+            }                                                                                 \
+        };                                                                                    \
+    }                                                                                         \
+    namespace mgi                                                                             \
     {
