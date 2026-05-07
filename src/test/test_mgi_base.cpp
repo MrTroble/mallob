@@ -10,7 +10,8 @@
 
 using namespace mgi;
 
-void testRoutine() {
+void testRoutine()
+{
     DeferredAPI deferred = initMGI();
     Kernel kernel = deferred.loadKernel("mgi_kernel/test_kernel.cpp");
     assert(kernel);
@@ -19,27 +20,28 @@ void testRoutine() {
     constexpr size_t sizeOfTestData = sizeof(testData);
 
     LOG(V2_INFO, "Starting Allocation Tests!\n");
-    AllocationInfo globalAllocation = { {}, MemoryType::Global, 128};
-    AllocationInfo globalWithInitalMemory = { {}, MemoryType::Global, sizeOfTestData, testData, sizeOfTestData };
-    AllocationInfo deviceLocal = { {}, MemoryType::DeviceLocal, 128 };
-    AllocationInfo deviceLocalWithInitalMemory = { {}, MemoryType::DeviceLocal, sizeOfTestData, testData, sizeOfTestData };
+    AllocationInfo globalAllocation = {{}, MemoryType::Global, 128};
+    AllocationInfo globalWithInitalMemory = {{}, MemoryType::Global, sizeOfTestData, testData, sizeOfTestData};
+    AllocationInfo deviceLocal = {{}, MemoryType::DeviceLocal, 128};
+    AllocationInfo deviceLocalWithInitalMemory = {{}, MemoryType::DeviceLocal, sizeOfTestData, testData, sizeOfTestData};
     std::vector<AllocationInfo> infos{globalAllocation, globalWithInitalMemory, deviceLocal, deviceLocalWithInitalMemory};
     const auto memories = deferred.allocate(infos);
-    for(const auto memory : memories) {
+    for (const auto memory : memories)
+    {
         assert(memory);
     }
     LOG(V2_INFO, "Allocations finished!\n");
     LOG(V2_INFO, "Start Read Testing!\n");
-    std::vector<ReadInfo> readInfos = { ReadInfo{sizeOfTestData} };
+    std::vector<ReadInfo> readInfos = {ReadInfo{sizeOfTestData}};
     {
         const auto readData = deferred.readMemory(memories[1], readInfos);
-        LOG(V2_INFO, "Read Global: %s\n", (const char*)readData.ptr[0]);
-        assert(strcmp((const char*)readData.ptr[0], testData) == 0);
+        LOG(V2_INFO, "Read Global: %s\n", (const char *)readData.ptr[0]);
+        assert(strcmp((const char *)readData.ptr[0], testData) == 0);
     }
     {
         const auto readData = deferred.readMemory(memories[3], readInfos);
-        LOG(V2_INFO, "Read Device Local: %s\n", (const char*)readData.ptr[0]);
-        assert(strcmp((const char*)readData.ptr[0], testData) == 0);
+        LOG(V2_INFO, "Read Device Local: %s\n", (const char *)readData.ptr[0]);
+        assert(strcmp((const char *)readData.ptr[0], testData) == 0);
     }
     LOG(V2_INFO, "Read finished!\n");
 
@@ -52,12 +54,12 @@ void testRoutine() {
     std::array taskInfos = {taskInfo};
     const auto status = deferred.queueWaitTasks(taskInfos);
     {
-        std::array readsIn = {ReadInfo{ values.size() * sizeof(uint32_t) }};
+        std::array readsIn = {ReadInfo{values.size() * sizeof(uint32_t)}};
         const auto readData = deferred.readMemory(taskMems[0], readsIn);
         for (size_t i = 0; i < values.size(); i++)
         {
-            const auto shaderValue = ((uint32_t*)readData.ptr[0])[i];
-            assert(shaderValue == i*2);
+            const auto shaderValue = ((uint32_t *)readData.ptr[0])[i];
+            assert(shaderValue == i * 2);
         }
     }
     const auto tasksOut = deferred.queueTasks(taskInfos);
@@ -69,9 +71,30 @@ void testRoutine() {
     assert(postWait.size() == 1);
     assert(postWait[0] == TaskStatus::Complete);
     LOG(V2_INFO, "Kernel Tasks finished!\n");
+    LOG(V2_INFO, "Memory Write Test Start!\n");
+    std::vector<uint32_t> valuesLeft(values.size() / 2, 1u);
+    std::vector<uint32_t> valuesRight(values.size() / 2, 2u);
+    std::vector updateInfos = {BufferUpdateInfo::from<uint32_t>(valuesLeft), 
+                               BufferUpdateInfo::from<uint32_t>(valuesRight, valuesLeft.size() * sizeof(uint32_t))};
+    deferred.writeMemory(taskMems[0], updateInfos);
+    {
+        std::array readsIn = {ReadInfo{values.size() * sizeof(uint32_t)}};
+        const auto readData = deferred.readMemory(taskMems[0], readsIn);
+        const uint32_t* ptr = (uint32_t*)readData.ptr[0];
+        for (size_t i = 0; i < valuesLeft.size(); i++)
+        {
+            assert(ptr[i] == 1);
+        }
+        for (size_t i = 0; i < valuesRight.size(); i++)
+        {
+            assert(ptr[i + valuesLeft.size()] == 2);
+        }
+    }
+    LOG(V2_INFO, "Memory Write finished!\n");
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
 
     MyMpi::init();
     Timer::init();
