@@ -6,6 +6,7 @@
 
 namespace mgi {
     struct Kernel : public TypeHandle {};
+    MGI_DEFINE_TYPE_HASH(mgi::Kernel);
 
     struct OCLDeferredAPI;
 

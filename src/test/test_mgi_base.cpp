@@ -60,6 +60,14 @@ void testRoutine() {
             assert(shaderValue == i*2);
         }
     }
+    const auto tasksOut = deferred.queueTasks(taskInfos);
+    const auto preWait = deferred.getStatus(tasksOut);
+    assert(preWait.size() == 1);
+    assert(preWait[0] != TaskStatus::Error);
+    deferred.waitTasks(tasksOut);
+    const auto postWait = deferred.getStatus(tasksOut);
+    assert(postWait.size() == 1);
+    assert(postWait[0] == TaskStatus::Complete);
     LOG(V2_INFO, "Kernel Tasks finished!\n");
 }
 

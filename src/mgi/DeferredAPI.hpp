@@ -206,7 +206,8 @@ namespace mgi
         Queued,
         Submitted,
         Running,
-        Complete
+        Complete,
+        Error
     };
 
 #ifdef MGI_API_OCL
@@ -226,6 +227,22 @@ namespace mgi
         default:
             LOG(V0_CRIT, "The given type is not valid for buffer creation! Extension defined?\n");
             return {};
+        }
+    }
+
+    inline TaskStatus toTaskStatus(cl_int value) {
+        switch (value)
+        {
+        case CL_QUEUED:
+            return TaskStatus::Queued;
+        case CL_SUBMITTED:
+            return TaskStatus::Submitted;
+        case CL_RUNNING:
+            return TaskStatus::Running;
+        case CL_COMPLETE:
+            return TaskStatus::Complete;
+        default:
+            return TaskStatus::Error;
         }
     }
 
@@ -530,6 +547,22 @@ namespace mgi
             const auto& tasks = queueTasks(taskInfos, strategy);
             MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event*)tasks.data()), "Wait Tasks failed!");
             return std::vector(tasks.size(), TaskStatus::Complete);
+        }
+
+        void waitTasks(span<const Task> tasks) {
+            MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event*)tasks.data()), "Wait Tasks failed!");
+        }
+
+        std::vector<TaskStatus> getStatus(span<const Task> tasks) {
+            cl_int value = 0;
+            std::vector<TaskStatus> status(tasks.size());
+            size_t index = 0;
+            for(const auto t : tasks) {
+                const auto error = clGetEventInfo((cl_event)t.internal, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(value), &value, nullptr);
+                MGI_DB_CHECK(error, "Could not get event info!");
+                status[index++] = toTaskStatus(value);
+            }
+            return status;
         }
     };
 

@@ -32,15 +32,14 @@ namespace mgi
     {
         size_t internal = SIZE_MAX;
 
-        inline operator bool() const
+        inline explicit operator bool() const
         {
             return internal != SIZE_MAX;
         }
 
-        template <typename T>
-        inline bool operator==(const T &other)
+        inline bool operator!() const
         {
-            return other.internal == internal;
+            return internal == SIZE_MAX;
         }
     };
 
@@ -156,8 +155,9 @@ namespace mgi
 // TODO THIS IS STUPID REMOVE WITH C++20 Conecpts
 // THIS IS DOUBLE STUPID BC WE NEED TO SEPERATLY DEFINE == FOR EACH NO TEMPLATE SUPPORT!
 #define MGI_DEFINE_TYPE_HASH(t1)                                                              \
+    inline bool operator==(const t1 f1, const t1 f2) { return f1.internal == f2.internal; }   \
     }                                                                                         \
-    inline bool operator==(const t1 &f1, const t1 &f2) { return f1.internal == f1.internal; } \
+    inline bool operator==(const t1 f1, const t1 f2) { return f1.internal == f2.internal; }   \
     namespace std                                                                             \
     {                                                                                         \
         template <>                                                                           \
