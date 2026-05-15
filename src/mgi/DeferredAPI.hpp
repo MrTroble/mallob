@@ -4,15 +4,15 @@
 #include <mutex>
 #include <shared_mutex>
 #include <numeric>
-
+#include <vector>
 #include "KernelLoader.hpp"
 #ifdef MGI_API_OCL
+#define CL_HPP_TARGET_OPENCL_VERSION 300
 #include <CL/opencl.hpp>
 #endif
 
 namespace mgi
 {
-
     struct InitInfo
     {
         std::vector<float> queuePriorities{1.0f};
@@ -643,7 +643,7 @@ namespace mgi
         }
     };
 
-    inline OCLDeferredAPI initMGI(const InitInfo &info = {})
+    inline OCLSetup initMGI(const InitInfo &info = {})
     {
         OCLSetup setup;
         std::vector<cl::Platform> platforms;
@@ -705,10 +705,21 @@ namespace mgi
                 deviceQueues.emplace_back(std::move(queue));
             }
         }
-        return OCLDeferredAPI{std::move(setup)};
+        return setup;
     }
 
     using DeferredAPI = OCLDeferredAPI;
 #endif
-
 }
+
+#ifndef MALLOB_USE_GPU // Dummy
+#ifdef MGI_API_OCL
+#error "OCL is active even tho GPU support is disabled!"
+#endif
+namespace mgi
+{
+    inline int initMGI(const InitInfo &info = {}) { return 0; }
+    
+    struct DeferredAPI { int t; };
+}
+#endif

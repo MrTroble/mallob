@@ -18,6 +18,7 @@
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
 #include "data/job_result.hpp"
+#include "mgi/DeferredAPI.hpp"
 
 class AnytimeSatClauseCommunicator; // fwd decl
 class Checksum;
@@ -56,6 +57,7 @@ private:
     float _retraction_round_duration = 0;
 
 public:
+    mgi::DeferredAPI deferredAPI;
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     virtual ~ForkedSatJob() override;

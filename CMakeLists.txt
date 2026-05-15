@@ -254,7 +254,7 @@ set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP
                              ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
 
 # Currently default to OpenCL
-add_definitions(-DMGI_API_OCL=1)
+add_definitions(-DMGI_API_OCL=1 -DMALLOB_USE_GPU=1)
 
 add_library(mallob_mgi STATIC "src/mgi/KernelLoader.cpp" "src/mgi/DeferredAPI.cpp")
 target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})

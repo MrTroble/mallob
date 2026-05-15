@@ -39,7 +39,7 @@
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) : 
-        BaseSatJob(params, setup, table) {
+        BaseSatJob(params, setup, table), deferredAPI(mgi::initMGI()) {
     _subproc_idx = _static_subprocess_index.fetch_add(1, std::memory_order_relaxed);
 }
 
