@@ -11,6 +11,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
+#include "gpu_clause_interface.hpp"
 #include "scheduling/core_allocator.hpp"
 #include "util/sys/shmem_cache.hpp"
 #include "util/params.hpp"
@@ -57,7 +58,10 @@ private:
     float _retraction_round_duration = 0;
 
 public:
-    mgi::DeferredAPI deferredAPI;
+    mgi::DeferredAPI deferredAPI; // TODO does this need to be public?
+
+private:
+    GpuClauseInterface _gpu_clauses;
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     virtual ~ForkedSatJob() override;

@@ -9,6 +9,7 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
+#include "gpu_clause_interface.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"
@@ -54,9 +55,16 @@ private:
 
     int _last_skipped_epochs_warning {0};
 
+    // If non null, this is a non owned reference that always survives
+    // this object's life scope. 
+    GpuClauseInterface* _gpu_clauses {nullptr};
+
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
     void initCrossSharer();
+    void setGpuClauseInterface(GpuClauseInterface* gpuClauses) {
+        _gpu_clauses = gpuClauses;
+    }
 
     void communicate();
     void handle(int source, int mpiTag, JobMessage& msg);

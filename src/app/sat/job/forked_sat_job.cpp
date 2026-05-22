@@ -39,7 +39,8 @@
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) : 
-        BaseSatJob(params, setup, table), deferredAPI(mgi::initMGI()) {
+        BaseSatJob(params, setup, table), deferredAPI(mgi::initMGI()),
+        _gpu_clauses(deferredAPI) {
     _subproc_idx = _static_subprocess_index.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -74,6 +75,7 @@ void ForkedSatJob::doStartSolver() {
 
     if (!_initialized) {
         _clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
+        _clause_comm->setGpuClauseInterface(_gpu_clauses);
     }
 
     _solver.reset(new SatProcessAdapter(
@@ -84,6 +86,11 @@ void ForkedSatJob::doStartSolver() {
         desc.getJobDescriptionId(0),
         _clause_comm
     ));
+
+    // Forward original problem clauses to GPU Clause interface
+    assert(!desc.isRevisionIncomplete(0)); // TODO catch / (how to?) handle
+    _gpu_clauses.insertOriginalClauses(desc.getFormulaPayload(0), desc.getFormulaPayloadSize(0));
+
     loadIncrements();
 
     //log(V5_DEBG, "%s : beginning to solve\n", toStr());
