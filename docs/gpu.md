@@ -11,7 +11,7 @@ To use GPU accelerated sat solving, the mallob gpu api (MGI) needs to be enabled
 
 You need the newest [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) from NVIDIA
 
-> [!INFO]
+> [!NOTE]
 > This is currently tested on *Fedora 43* and *Debian 13*
 
 ### AMD
