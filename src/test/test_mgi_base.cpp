@@ -102,12 +102,13 @@ void testRoutine()
     clauses[elementsPerClaus] = 0;
     for (size_t i = 0; i < elementsPerClaus; i++)
     {
-        clauses[i] = i;
-        clauses[i + elementsPerClaus + 1] = -(int)i;
+        clauses[i] = i + 1;
+        clauses[i + elementsPerClaus + 1] = -(int)i - 1;
     }
     assert(GpuClauseInterface::canUseGPU());
     gpuInterface.insertClausesFromSharing(clauses);
 
+    LOG(V2_INFO, "Finished Clause Interface test\n");
 }
 
 int main(int argc, char *argv[])
