@@ -115,6 +115,11 @@ namespace mgi
         {
             return {{}, type, value.size_bytes(), value.data(), value.size_bytes()};
         }
+
+        constexpr static AllocationInfo from(MemoryType type, size_t value)
+        {
+            return {{}, type, value};
+        }
     };
 
     struct AllocationSlab
@@ -133,13 +138,42 @@ namespace mgi
     struct AllocationStrategy
     {
 
-        virtual ~AllocationStrategy() {}
+        virtual ~AllocationStrategy();
 
         virtual std::vector<AllocationSlab> slabs(span<const AllocationInfo> infos) const;
 
         virtual bool needsSubBuffers(span<const AllocationInfo> infos) const;
 
         virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos) const;
+    };
+
+    struct AllocationCache
+    {
+        std::vector<std::pair<size_t, mgi::Memory>> memoryCache;
+        size_t cacheLoadCount = 0;
+
+        void retire(mgi::Memory memory, size_t size) {
+            if(memoryCache.size() >= cacheLoadCount) [[likely]] {
+                const auto iter = std::min_element(memoryCache.begin(), memoryCache.end(), [](auto c1, auto c2){ return c1.first < c2.first;});
+                if(iter == std::end(memoryCache)) return;
+                std::swap(*iter, memoryCache.back());
+                memoryCache.back() = std::make_pair(size, memory);
+                return;
+            }
+            memoryCache.emplace_back(size, memory);
+        }
+
+        mgi::Memory tryGet(size_t size) {
+            mgi::Memory memory;
+            size_t lastSize = 0;
+            for(auto &[currentSize, currentMemory] : memoryCache) {
+                if(currentSize <= size && lastSize < currentSize) {
+                    memory = currentMemory;
+                    lastSize = currentSize;
+                }
+            }
+            return memory;
+        }
     };
 
     struct ReadInfo

@@ -75,7 +75,7 @@ void ForkedSatJob::doStartSolver() {
 
     if (!_initialized) {
         _clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
-        _clause_comm->setGpuClauseInterface(_gpu_clauses);
+        _clause_comm->setGpuClauseInterface(&_gpu_clauses);
     }
 
     _solver.reset(new SatProcessAdapter(
@@ -89,7 +89,7 @@ void ForkedSatJob::doStartSolver() {
 
     // Forward original problem clauses to GPU Clause interface
     assert(!desc.isRevisionIncomplete(0)); // TODO catch / (how to?) handle
-    _gpu_clauses.insertOriginalClauses(desc.getFormulaPayload(0), desc.getFormulaPayloadSize(0));
+    _gpu_clauses.insertOriginalClauses({desc.getFormulaPayload(0), desc.getFormulaPayloadSize(0)});
 
     loadIncrements();
 

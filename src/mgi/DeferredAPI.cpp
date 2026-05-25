@@ -2,6 +2,8 @@
 
 namespace mgi
 {
+    AllocationStrategy::~AllocationStrategy() {}
+
     std::vector<AllocationSlab> AllocationStrategy::slabs(span<const AllocationInfo> infos) const
     {
         std::vector<AllocationSlab> sizeValues(infos.size());

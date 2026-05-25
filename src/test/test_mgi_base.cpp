@@ -7,6 +7,7 @@
 #include "util/sys/process.hpp"
 #include "mgi/KernelLoader.hpp"
 #include "mgi/DeferredAPI.hpp"
+#include "app/sat/job/gpu_clause_interface.hpp"
 
 using namespace mgi;
 
@@ -91,6 +92,22 @@ void testRoutine()
         }
     }
     LOG(V2_INFO, "Memory Write finished!\n");
+
+    LOG(V2_INFO, "GPU Clause Interface test\n");
+
+    GpuClauseInterface gpuInterface(deferred);
+    // Test clauses: All positiv + All negativ
+    const size_t elementsPerClaus = 16;
+    std::vector<int> clauses(2*elementsPerClaus + 1);
+    clauses[elementsPerClaus] = 0;
+    for (size_t i = 0; i < elementsPerClaus; i++)
+    {
+        clauses[i] = i;
+        clauses[i + elementsPerClaus + 1] = -(int)i;
+    }
+    assert(GpuClauseInterface::canUseGPU());
+    gpuInterface.insertClausesFromSharing(clauses);
+
 }
 
 int main(int argc, char *argv[])

@@ -57,11 +57,10 @@ private:
     float _time_of_retraction_end = -1;
     float _retraction_round_duration = 0;
 
-public:
-    mgi::DeferredAPI deferredAPI; // TODO does this need to be public?
-
-private:
+    mgi::DeferredAPI deferredAPI; // TODO make this public if we want to use this in threads
     GpuClauseInterface _gpu_clauses;
+
+public:
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     virtual ~ForkedSatJob() override;

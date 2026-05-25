@@ -62,4 +62,13 @@ Provided the `MALLOB_LOG_VERBOSITY` is set correctly (>=debug).
 
 ## Development
 
+## Defines
+
+These defines can be used to check for features in the code C++ host code.
+
+|Flag|Usage|
+|-|-|
+|`MGI_API_OCL`| Enabled if OpenCL is used as backend 
+|`MALLOB_USE_GPU`| Enabled if MGI is enabled.
+
 TODO -> From Notes

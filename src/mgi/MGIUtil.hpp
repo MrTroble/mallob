@@ -54,6 +54,9 @@ namespace mgi
         template <typename G>
         MGISpan(const G &holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
 
+        template <typename G>
+        MGISpan(const G* ptr, size_t size) : beginPtr(ptr), endPtr(ptr + size) {}
+
         size_t size() const
         {
             return size_t(endPtr - beginPtr);

@@ -256,10 +256,9 @@ set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP
 # Currently default to OpenCL
 add_definitions(-DMGI_API_OCL=1 -DMALLOB_USE_GPU=1)
 
-add_library(mallob_mgi STATIC "src/mgi/KernelLoader.cpp" "src/mgi/DeferredAPI.cpp")
-target_include_directories(mallob_mgi PRIVATE ${BASE_INCLUDES})
-target_compile_options(mallob_mgi PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_mgi mallob_corepluscomm)
+set(MALLOB_CORE_SOURCES
+    ${MALLOB_CORE_SOURCES}
+    "src/mgi/KernelLoader.cpp" "src/mgi/DeferredAPI.cpp")
 
 file(GLOB kernelfiles "src/mgi_kernel/*.*")
 
@@ -271,7 +270,7 @@ foreach(file ${kernelfiles})
   list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
 endforeach()
 add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
-add_dependencies(mallob_mgi shaderTarget)
+add_dependencies(mallob_core shaderTarget)
 endif()
 
 foreach(file ${kernelfiles})
@@ -335,5 +334,5 @@ new_test(bidirectional_pipe "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe_shmem "${BASE_INCLUDES}" mallob_core)
 
 if(MALLOB_USE_GPU)
-new_test(mgi_base "${BASE_INCLUDES}" mallob_mgi)
+new_test(mgi_base "${BASE_INCLUDES}" mallob_corepluscomm)
 endif()
