@@ -17,11 +17,15 @@ namespace mgi
             return {};
         cl::Program program(api->init.context, source);
 
+        // TODO Dynamic!!!
         const auto kernelDefs = mgi::wholeFile<std::string>("mgi_kernel/MGIKernelDefs.hpp");
         cl::Program kernelDefsProgram(api->init.context, kernelDefs);
 
-        std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram};
-        std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp"};
+        const auto kernelShared = mgi::wholeFile<std::string>("mgi_kernel/MGIShared.hpp");
+        cl::Program kernelSharedProgram(api->init.context, kernelShared);
+
+        std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram, kernelShared};
+        std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp", "MGIShared.hpp"};
         std::string compilerOptions = "-cl-std=CL2.0 -D MGI_API_OCL -I ./";
 
         try

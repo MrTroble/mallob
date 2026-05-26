@@ -16,6 +16,7 @@ class GpuClauseInterface {
 
 private:
     mgi::DeferredAPI& _mgi_api;
+    mgi::Kernel resolutionKernel;
 
     // TODO getLoad() function or sth similar?
     // Function called from within (?)
@@ -46,11 +47,9 @@ private:
         
     }
 
-    mgi::Kernel resolutionKernel;
-
 public:
     GpuClauseInterface(mgi::DeferredAPI& mgiApi) : _mgi_api(mgiApi) {
-        resolutionKernel = mgiApi.loadKernel("resolution_kernel.cpp");
+        resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
     } 
 
     inline constexpr static bool canUseGPU() {
