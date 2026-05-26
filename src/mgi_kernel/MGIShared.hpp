@@ -19,6 +19,10 @@ extern "C" {
     using namespace std;
 
     typedef std::atomic<float> atomic_float;
+
+    #define MGI_K_INLINE inline
+#else
+    #define MGI_K_INLINE
 #endif
 typedef uint2 m_uint2;
 
@@ -26,7 +30,7 @@ typedef struct __mgi_rng {
     m_uint2 seed;
 } MGIRng;
 
-float mgiUintToFloat(m_uint x) {
+MGI_K_INLINE float mgiUintToFloat(m_uint x) {
     union {
         unsigned int a;
         float b;
@@ -36,7 +40,7 @@ float mgiUintToFloat(m_uint x) {
 }
 
 // returns random float between (0,1]
-float mgiRNGRndFloat(MGIRng* rng) {
+MGI_K_INLINE float mgiRNGRndFloat(MGIRng* rng) {
     // PCG2D, as described here: https://jcgt.org/published/0009/03/02/
     rng->seed = 1664525u * rng->seed + 1013904223u;
     rng->seed.x += 1664525u * rng->seed.y;

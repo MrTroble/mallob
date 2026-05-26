@@ -7,6 +7,10 @@ To use GPU accelerated sat solving, the mallob gpu api (MGI) needs to be enabled
 > [!WARNING]  
 > Currently MGI only supports **OpenCL 3.0** as backend
 
+The usage of `clang` and the respective packages for `llvm-spirv` are highly recommanded and are default enabled.
+`clang++`, `llvm-spirv` and all required packages are assumed to be installed. 
+If you want to disable OpenCL C to SPIR-V auto-compile use the appropriate flag in the flags section.
+
 ### NVIDIA
 
 You need the newest [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) from NVIDIA

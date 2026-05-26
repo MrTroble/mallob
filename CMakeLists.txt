@@ -263,14 +263,14 @@ set(MALLOB_CORE_SOURCES
 file(GLOB kernelfiles "src/mgi_kernel/*.*")
 
 # Test compile kernels
-if(NOT ${MALLOB_MGI_NO_TEST_COMPILE})
+if((NOT DEFINED ${MALLOB_MGI_NO_TEST_COMPILE}) OR (NOT ${MALLOB_MGI_NO_TEST_COMPILE}))
 foreach(file ${kernelfiles})
   cmake_path(GET file FILENAME filename)
-  add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" COMMAND clang "-cl-std=clc++" "-I" "${CMAKE_BINARY_DIR}/mgi_kernel" "--target=spirv64" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
+  add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" COMMAND clang "-cl-std=cl3.0" "-I" "${CMAKE_BINARY_DIR}/mgi_kernel" "--target=spirv64" "-DMGI_API_OCL=1" "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
   list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
 endforeach()
+message("Enabled test compile!")
 add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
-add_dependencies(mallob_core shaderTarget)
 endif()
 
 foreach(file ${kernelfiles})
@@ -289,6 +289,11 @@ target_link_libraries(mallob_core ${BASE_LIBS})
 target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
 if (DEFINED MALLOB_CORE_DEPS)
     add_dependencies(mallob_core ${MALLOB_CORE_DEPS})
+endif()
+
+# Add the shader precompile if it is generated
+if(TARGET shaderTarget)
+add_dependencies(mallob_core shaderTarget)
 endif()
 
 # Library of Mallob's CORE+COMM sources
