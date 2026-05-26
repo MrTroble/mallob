@@ -23,6 +23,7 @@ private:
         // TODO add compression stages and use the correct kernel
         using namespace mgi;
 
+        // TODO Prefix calculations multi threaded!!!
         std::vector<uint32_t> prefixes;
         prefixes.push_back(0);
         for (auto i = std::find(values.begin(), values.end(), 0); 
