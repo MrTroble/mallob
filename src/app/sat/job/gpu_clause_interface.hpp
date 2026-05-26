@@ -24,6 +24,7 @@ private:
         using namespace mgi;
 
         // TODO Prefix calculations multi threaded!!!
+        // THIS IS BULLSHIT!
         std::vector<uint32_t> prefixes;
         prefixes.push_back(0);
         for (auto i = std::find(values.begin(), values.end(), 0); 
@@ -45,8 +46,12 @@ private:
         
     }
 
+    mgi::Kernel resolutionKernel;
+
 public:
-    GpuClauseInterface(mgi::DeferredAPI& mgiApi) : _mgi_api(mgiApi) {} 
+    GpuClauseInterface(mgi::DeferredAPI& mgiApi) : _mgi_api(mgiApi) {
+        resolutionKernel = mgiApi.loadKernel("resolution_kernel.cpp");
+    } 
 
     inline constexpr static bool canUseGPU() {
         #ifdef MALLOB_USE_GPU

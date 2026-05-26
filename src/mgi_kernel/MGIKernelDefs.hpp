@@ -3,7 +3,7 @@
 
 #ifdef MGI_API_OCL
 #define MGI_KERNEL __kernel
-#define MGI_IN __constant
+#define MGI_IN __constant const
 #define MGI_OUT __global
 #define MGI_INOUT __global
 #define MGI_GID get_global_id(0)

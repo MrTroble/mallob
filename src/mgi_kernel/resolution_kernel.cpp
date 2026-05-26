@@ -14,9 +14,9 @@ void mgiReserviorAddSample(MGI_OUT MGIReservoir* reservior, MGIRng* rng, MGIReso
     }
 }
 
-bool checkIsInverseIn(int clause, int* literalsBegin, int* literalsEnd) {
-    for(int* iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
-        if(*iter + clause == 0) return true; // SIMD?
+bool checkIsInverseIn(int clause, MGI_IN int* literalsBegin, MGI_IN int* literalsEnd) {
+    for(MGI_IN int* iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
+        if((*iter + clause) == 0) return true; // SIMD?
     return false;
 }
 
@@ -26,11 +26,23 @@ MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts
     const m_uint position = clausesStarts[x];
     const m_uint sizeOfClause = clausesStarts[x + 1] - position;
 
-    const m_uint y = ((MGI_GID_Y) + x + 1) % (MGI_GSIZE_X); // Only compares with a halfe turnaround 
+    const m_uint size = MGI_GSIZE_X;
+    const m_uint y = ((MGI_GID_Y) + x + 1) % size; // Only compares with a halfe turnaround 
                                                             // because otherwise we would double check
-    const m_uint otherPosition = clausesStarts[y];
-    const m_uint otherSize = clausesStarts[y + 1] - otherPosition;
+    MGI_IN int* otherBegin = clauses + clausesStarts[y];
+    MGI_IN int* otherEnd = clauses + clausesStarts[y + 1];
+
+    MGI_OUT MGIResolveInfo* localResolve = toResolve + x + y*size;
+    localResolve->literal = 0;
 
     // TODO Cached version
-
+    MGI_IN int* endIter = clauses + clausesStarts[x + 1];
+    for(MGI_IN int* iter = clauses + position; iter != endIter; iter++) {
+        if(checkIsInverseIn(*iter, otherBegin, otherEnd)) {
+            localResolve->literal = *iter;
+            localResolve->clauseOne = x;
+            localResolve->clauseTwo = y;
+            break;
+        }
+    }
 }
