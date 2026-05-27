@@ -75,13 +75,13 @@ void testRoutine()
     LOG(V2_INFO, "Memory Write Test Start!\n");
     std::vector<uint32_t> valuesLeft(values.size() / 2, 1u);
     std::vector<uint32_t> valuesRight(values.size() / 2, 2u);
-    std::vector updateInfos = {BufferUpdateInfo::from<uint32_t>(valuesLeft), 
+    std::vector updateInfos = {BufferUpdateInfo::from<uint32_t>(valuesLeft),
                                BufferUpdateInfo::from<uint32_t>(valuesRight, valuesLeft.size() * sizeof(uint32_t))};
     deferred.writeMemory(taskMems[0], updateInfos);
     {
         std::array readsIn = {ReadInfo{values.size() * sizeof(uint32_t)}};
         const auto readData = deferred.readMemory(taskMems[0], readsIn);
-        const uint32_t* ptr = (uint32_t*)readData.ptr[0];
+        const uint32_t *ptr = (uint32_t *)readData.ptr[0];
         for (size_t i = 0; i < valuesLeft.size(); i++)
         {
             assert(ptr[i] == 1);
@@ -98,7 +98,7 @@ void testRoutine()
     GpuClauseInterface gpuInterface(deferred);
     // Test clauses: All positiv + All negativ
     const size_t elementsPerClaus = 16;
-    std::vector<int> clauses(2*elementsPerClaus + 1);
+    std::vector<int> clauses(2 * elementsPerClaus + 1);
     clauses[elementsPerClaus] = 0;
     for (size_t i = 0; i < elementsPerClaus; i++)
     {
@@ -109,6 +109,41 @@ void testRoutine()
     gpuInterface.insertClausesFromSharing(clauses);
 
     LOG(V2_INFO, "Finished Clause Interface test\n");
+}
+
+namespace test
+{
+
+#undef MGI_API_OCL
+#include "mgi_kernel/resolution_kernel.cpp"
+#define MGI_API_OCL 1
+
+    void testResolutionKernel()
+    {
+        LOG(V2_INFO, "Begin Kernel TESTS on HOST!\n");
+
+        // Test clauses: All positiv + All negativ
+        const size_t elementsPerClaus = 16;
+        std::vector<int> clauses(2 * elementsPerClaus + 1);
+        clauses[elementsPerClaus] = 0;
+        for (size_t i = 0; i < elementsPerClaus; i++)
+        {
+            clauses[i] = i + 1;
+            clauses[i + elementsPerClaus + 1] = -(int)i - 1;
+        }
+
+        std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2*elementsPerClaus+1};
+        std::vector<MGIResolveInfo> resolves(2);
+        xSize = 2;
+        findResolvents(clauses.data(), beginings.data(), resolves.data());
+        MGIResolveInfo localResolve = resolves[0];
+        assert(localResolve.clauseTwo == 1);
+        assert(localResolve.clauseOne == 0);
+        assert(localResolve.literal != 0);
+        assert(std::abs(localResolve.literal) <= elementsPerClaus);
+
+        LOG(V2_INFO, "End Kernel TESTS on HOST!\n");
+    }
 }
 
 int main(int argc, char *argv[])
@@ -127,6 +162,7 @@ int main(int argc, char *argv[])
     params.init(argc, argv);
     MyMpi::setOptions(params);
 
+    test::testResolutionKernel();
     testRoutine();
 
     MPI_Finalize();

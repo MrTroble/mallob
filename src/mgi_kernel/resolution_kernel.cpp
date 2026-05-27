@@ -27,12 +27,12 @@ MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts
     const m_uint sizeOfClause = clausesStarts[x + 1] - position;
 
     const m_uint size = MGI_GSIZE_X;
-    const m_uint y = ((MGI_GID_Y) + x + 1) % size; // Only compares with a halfe turnaround 
+    const m_uint y = ((MGI_GID_Y) + x + 1) % size; // Only compares with a halfe turnaround (n - 1)n/2
                                                             // because otherwise we would double check
     MGI_IN int* otherBegin = clauses + clausesStarts[y];
     MGI_IN int* otherEnd = clauses + clausesStarts[y + 1];
 
-    MGI_OUT MGIResolveInfo* localResolve = toResolve + x + y*size;
+    MGI_OUT MGIResolveInfo* localResolve = toResolve + x*size + y;
     localResolve->literal = 0;
 
     // TODO Cached version
@@ -44,5 +44,22 @@ MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts
             localResolve->clauseTwo = y;
             break;
         }
+    }
+}
+
+m_uint resolve(MGI_IN MGIResolveInfo* resolve, MGI_IN int* clauses, MGI_IN m_uint* clausesStarts, MGI_OUT int* newClause) {
+    MGI_OUT int* iter = newClause;
+    MGIResolveInfo localResolve = *resolve;
+    m_uint firstStart = clausesStarts[localResolve.clauseOne];
+    m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart;
+    m_uint secondStart = clausesStarts[localResolve.clauseTwo];
+    m_uint sizeSecond = clausesStarts[localResolve.clauseTwo + 1] - secondStart;
+
+    MGI_IN int* clausStartFirst = clauses + firstStart;
+    for(m_uint x = 0; x < sizeFirst; x++) {
+        m_uint current = clausStartFirst[x];
+        if(current == localResolve.literal) continue;
+        *iter = current;
+        iter++;
     }
 }

@@ -216,7 +216,9 @@ namespace mgi
         }
     };
 
-    using MemoryDescriptor = std::vector<Memory>;
+    struct MemoryDescriptor {
+        std::vector<Memory> memory;
+    };
 
     struct Task : public TypeHandle
     {
@@ -634,7 +636,7 @@ namespace mgi
                 const auto kernel = clCloneKernel(mainKernel, &error);
                 MGI_DB_CHECK(error, "Could not clone Kernel!"); // To bad clone needed ... parameter caching needed!
                 uint32_t argID = 0;
-                for (auto desc : task.descriptor)
+                for (auto desc : task.descriptor.memory)
                 {
                     MGI_DB_CHECK(clSetKernelArg(kernel, argID++, sizeof(cl_mem), &desc),
                                  "Could not set kernel %s arguments for descriptors!", task.function.c_str());
