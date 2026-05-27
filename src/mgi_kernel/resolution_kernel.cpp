@@ -14,11 +14,15 @@ void mgiReserviorAddSample(MGI_OUT MGIReservoir* reservior, MGIRng* rng, MGIReso
     }
 }
 
+// TODO Redo with sorting
 bool checkIsInverseIn(int clause, MGI_IN int* literalsBegin, MGI_IN int* literalsEnd) {
     for(MGI_IN int* iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
         if((*iter + clause) == 0) return true; // SIMD?
     return false;
 }
+
+// TODO Reservoir based picking that only use different
+// use MGI_LOCAL MGIReservoir in order to only have atomics from each work group
 
 MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts, MGI_OUT MGIResolveInfo* toResolve)
 {
@@ -42,12 +46,15 @@ MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts
             localResolve->literal = *iter;
             localResolve->clauseOne = x;
             localResolve->clauseTwo = y;
+            localResolve->resolvedSize = 1; // TODO
             break;
         }
     }
 }
 
-m_uint resolve(MGI_IN MGIResolveInfo* resolve, MGI_IN int* clauses, MGI_IN m_uint* clausesStarts, MGI_OUT int* newClause) {
+// Merge for resolve
+
+MGI_KERNEL void resolve(MGI_IN MGIResolveInfo* resolve, MGI_IN int* clauses, MGI_IN m_uint* clausesStarts, MGI_OUT int* newClause) {
     MGI_OUT int* iter = newClause;
     MGIResolveInfo localResolve = *resolve;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];

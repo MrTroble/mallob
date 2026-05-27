@@ -57,6 +57,7 @@ typedef struct __mgi_resolve_info {
     int literal;
     m_uint clauseOne;
     m_uint clauseTwo;
+    m_uint resolvedSize;
 } MGIResolveInfo;
 
 typedef struct __mgi_reservoir {
