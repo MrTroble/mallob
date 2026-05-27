@@ -26,13 +26,13 @@ MGI_KERNEL void findResolvents(MGI_IN int* clauses, MGI_IN m_uint* clausesStarts
     const m_uint position = clausesStarts[x];
     const m_uint sizeOfClause = clausesStarts[x + 1] - position;
 
-    const m_uint size = MGI_GSIZE_X;
-    const m_uint y = ((MGI_GID_Y) + x + 1) % size; // Only compares with a halfe turnaround (n - 1)n/2
+    const m_uint sizeX = MGI_GSIZE_X;
+    const m_uint y = ((MGI_GID_Y) + x + 1) % (sizeX + 1); // Only compares with a halfe turnaround (n - 1)n/2
                                                             // because otherwise we would double check
     MGI_IN int* otherBegin = clauses + clausesStarts[y];
     MGI_IN int* otherEnd = clauses + clausesStarts[y + 1];
 
-    MGI_OUT MGIResolveInfo* localResolve = toResolve + x*size + y;
+    MGI_OUT MGIResolveInfo* localResolve = toResolve + x + (y - x - 1) * sizeX;
     localResolve->literal = 0;
 
     // TODO Cached version

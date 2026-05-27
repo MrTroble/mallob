@@ -134,7 +134,6 @@ namespace test
 
         std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2*elementsPerClaus+1};
         std::vector<MGIResolveInfo> resolves(2);
-        xSize = 2;
         findResolvents(clauses.data(), beginings.data(), resolves.data());
         MGIResolveInfo localResolve = resolves[0];
         assert(localResolve.clauseTwo == 1);
