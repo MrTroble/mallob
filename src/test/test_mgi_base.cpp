@@ -114,9 +114,7 @@ void testRoutine()
 namespace test
 {
 
-#undef MGI_API_OCL
 #include "mgi_kernel/resolution_kernel.cpp"
-#define MGI_API_OCL 1
 
     void testResolutionKernel()
     {
@@ -140,6 +138,13 @@ namespace test
         assert(localResolve.clauseOne == 0);
         assert(localResolve.literal != 0);
         assert(std::abs(localResolve.literal) <= elementsPerClaus);
+
+        MGIReservoir reservoir;
+        findResolventsReservoir(clauses.data(), beginings.data(), &reservoir);
+        assert(reservoir.resolve.resolvedSize == 0);
+        assert(reservoir.resolve.literal != 0);
+        assert(reservoir.resolve.clauseOne == 0);
+        assert(reservoir.resolve.clauseTwo == 1);
 
         LOG(V2_INFO, "End Kernel TESTS on HOST!\n");
     }

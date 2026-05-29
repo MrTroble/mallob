@@ -254,7 +254,7 @@ set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP
                              ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
 
 # Currently default to OpenCL
-add_definitions(-DMGI_API_OCL=1 -DMALLOB_USE_GPU=1)
+add_definitions(-DMGI_API_OCL_HOST=1 -DMALLOB_USE_GPU=1)
 
 set(MALLOB_CORE_SOURCES
     ${MALLOB_CORE_SOURCES}

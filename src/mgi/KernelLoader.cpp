@@ -1,14 +1,14 @@
 #include "KernelLoader.hpp"
 #include "DeferredAPI.hpp"
 
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
 #include <CL/opencl.hpp>
 #endif
 
 namespace mgi
 {
 
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
     Kernel KernelLoaderOCL::loadKernel(OCLDeferredAPI *api, const std::string &file)
     {
         // TODO Auto package binaries

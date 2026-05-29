@@ -20,24 +20,24 @@
 
 #else
 
-    static uint32_t xID = 0;
-    static uint32_t yID = 0;
-    static uint32_t xSize = 1;
-    static uint32_t ySize = 1;
+static uint32_t __mgi__xID = 0;
+static uint32_t __mgi__yID = 0;
+static uint32_t __mgi__xSize = 1;
+static uint32_t __mgi__ySize = 1;
 
 #define MGI_KERNEL
 #define MGI_IN
 #define MGI_OUT
 #define MGI_INOUT
-#define MGI_GID_X xID
-#define MGI_GID_Y yID
+#define MGI_GID_X __mgi__xID
+#define MGI_GID_Y __mgi__yID
 #define MGI_GID MGI_GID_X
 #define MGI_GID_Z 1
 #define MGI_GID_ND(x) 1
 
-#define MGI_GSIZE_X xSize
-#define MGI_GSIZE_Y ySize
-#define MGI_GSIZE xSize
+#define MGI_GSIZE_X __mgi__xSize
+#define MGI_GSIZE_Y __mgi__ySize
+#define MGI_GSIZE __mgi__xSize
 #define MGI_GSIZE_Z 1
 #define MGI_GSIZE_ND(x) 1
 

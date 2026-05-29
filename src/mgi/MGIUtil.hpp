@@ -8,7 +8,7 @@
 
 // TODO: Use __VA_OPT__ here ... there is currently no statandart usage hear ... TO BAD!
 // Change for C++20
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
 #define MGI_ERROR_CHECK(value, text, func, ...)                                                      \
     {                                                                                                \
         const auto err = (value);                                                                    \

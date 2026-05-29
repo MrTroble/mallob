@@ -57,17 +57,19 @@ MGI_KERNEL void findResolventsReservoir(MGI_IN int *clauses, MGI_IN m_uint *clau
 
     // Shuffle reservoirs
     MGI_PRIVATE MGIReservoir currentReservoir = toResolve[x];
+    currentReservoir.weight = 0;
+    currentReservoir.resolve.literal = 0;
     int literal = 0;
     const m_uint xSize = MGI_GSIZE_X; // Assume K - 1
-    MGI_GLOBAL int *currentBegin = clauses + position;
-    MGI_GLOBAL int *currentEnd = currentBegin + sizeOfClause;
+    MGI_CONST int *currentBegin = clauses + position;
+    MGI_CONST int *currentEnd = currentBegin + sizeOfClause;
     MGI_PRIVATE MGIResolveInfo resolve;
     resolve.clauseOne = x;
     for (m_uint i = x + 1; i <= xSize; i++)
     {
-        MGI_GLOBAL int *otherBegin = clauses + clausesStarts[i];
-        MGI_GLOBAL int *otherEnd = clauses + clausesStarts[i + 1];
-        MGI_GLOBAL int *iter = currentBegin;
+        MGI_CONST int *otherBegin = clauses + clausesStarts[i];
+        MGI_CONST int *otherEnd = clauses + clausesStarts[i + 1];
+        MGI_CONST int *iter = currentBegin;
         m_uint sizeOfOther = otherEnd - otherBegin;
         int difference = sizeOfClause - sizeOfOther;
         m_uint heuristic = difference;
@@ -83,7 +85,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_IN int *clauses, MGI_IN m_uint *clau
             {
                 if (resolve.literal != 0)
                 {
-                    resolve.resolvedSize = 0;
+                    heuristic = 0;
                     break;
                 }
                 resolve.literal = abs(l1);

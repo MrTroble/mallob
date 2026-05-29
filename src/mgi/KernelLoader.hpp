@@ -10,7 +10,7 @@ namespace mgi {
 
     struct OCLDeferredAPI;
 
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
     class KernelLoaderOCL {
 
     public:

@@ -27,17 +27,18 @@ extern "C" {
     #define MGI_K_INLINE
 #endif
 
-#ifdef MGI_API_OCL
-#define MGI_GLOBAL global 
-#define MGI_LOCAL local 
-#define MGI_CONST constant
-#define MGI_PRIVATE private 
-#else
-#define MGI_GLOBAL  
-#define MGI_LOCAL  
-#define MGI_CONST 
-#define MGI_PRIVATE  
-#endif
+    #ifdef MGI_API_OCL
+    #define MGI_GLOBAL global 
+    #define MGI_LOCAL local 
+    #define MGI_CONST const constant
+    #define MGI_PRIVATE private 
+    #else
+    #define MGI_GLOBAL  
+    #define MGI_LOCAL  
+    #define MGI_CONST 
+    #define MGI_PRIVATE  
+    #endif
+    
 typedef uint2 m_uint2;
 
 typedef struct __mgi_rng {
@@ -53,7 +54,7 @@ MGI_K_INLINE float mgiUintToFloat(m_uint x) {
     return u.b - 1.f;
 }
 
-MGI_K_INLINE float mgiRNGInit(MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
+MGI_K_INLINE void mgiRNGInit(MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
     rng->seed.x = x ^ (id << 16);
     rng->seed.y = y ^ ((id + seedVal) << 16);
 }

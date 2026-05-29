@@ -6,7 +6,7 @@
 #include <numeric>
 #include <vector>
 #include "KernelLoader.hpp"
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
 #define CL_HPP_TARGET_OPENCL_VERSION 300
 #include <CL/opencl.hpp>
 #endif
@@ -271,7 +271,7 @@ namespace mgi
         Error
     };
 
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
 
     inline cl_mem_flags toOCLMemoryType(MemoryType type)
     {
@@ -775,7 +775,7 @@ namespace mgi
 }
 
 #ifndef MALLOB_USE_GPU // Dummy
-#ifdef MGI_API_OCL
+#ifdef MGI_API_OCL_HOST
 #error "OCL is active even tho GPU support is disabled!"
 #endif
 namespace mgi
