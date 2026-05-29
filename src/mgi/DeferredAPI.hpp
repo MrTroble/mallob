@@ -152,10 +152,14 @@ namespace mgi
         std::vector<std::pair<size_t, mgi::Memory>> memoryCache;
         size_t cacheLoadCount = 0;
 
-        void retire(mgi::Memory memory, size_t size) {
-            if(memoryCache.size() >= cacheLoadCount) [[likely]] {
-                const auto iter = std::min_element(memoryCache.begin(), memoryCache.end(), [](auto c1, auto c2){ return c1.first < c2.first;});
-                if(iter == std::end(memoryCache)) return;
+        void retire(mgi::Memory memory, size_t size)
+        {
+            if (memoryCache.size() >= cacheLoadCount) [[likely]]
+            {
+                const auto iter = std::min_element(memoryCache.begin(), memoryCache.end(), [](auto c1, auto c2)
+                                                   { return c1.first < c2.first; });
+                if (iter == std::end(memoryCache))
+                    return;
                 std::swap(*iter, memoryCache.back());
                 memoryCache.back() = std::make_pair(size, memory);
                 return;
@@ -163,11 +167,14 @@ namespace mgi
             memoryCache.emplace_back(size, memory);
         }
 
-        mgi::Memory tryGet(size_t size) {
+        mgi::Memory tryGet(size_t size)
+        {
             mgi::Memory memory;
             size_t lastSize = 0;
-            for(auto &[currentSize, currentMemory] : memoryCache) {
-                if(currentSize <= size && lastSize < currentSize) {
+            for (auto &[currentSize, currentMemory] : memoryCache)
+            {
+                if (currentSize <= size && lastSize < currentSize)
+                {
                     memory = currentMemory;
                     lastSize = currentSize;
                 }
@@ -212,11 +219,12 @@ namespace mgi
         template <typename T>
         constexpr static BufferUpdateInfo from(span<const T> value, size_t offset = 0)
         {
-            return BufferUpdateInfo{(void*)value.data(), value.size_bytes(), offset};
+            return BufferUpdateInfo{(void *)value.data(), value.size_bytes(), offset};
         }
     };
 
-    struct MemoryDescriptor {
+    struct MemoryDescriptor
+    {
         std::vector<Memory> memory;
     };
 
@@ -250,6 +258,8 @@ namespace mgi
         Kernel kernel;
         std::string function;
         MemoryDescriptor descriptor;
+        size_t groupSizes[3] = {1, 1, 1};
+        std::vector<Task> waitForTasks;
     };
 
     enum class TaskStatus
@@ -578,9 +588,10 @@ namespace mgi
                                              { for(auto event : events) clRetainEvent(event); });
                 size_t idx = 0;
                 std::lock_guard lockWrite(*perMemoryMutex[memory]);
-                for(const auto& info : updates) {
+                for (const auto &info : updates)
+                {
                     MGI_DB_CHECK(clEnqueueWriteBuffer(queue, buffer, false, info.destinationOffset, info.size, info.data, 0, nullptr, &events[idx++]),
-                            "Could not enqueue write on allocate!");
+                                 "Could not enqueue write on allocate!");
                 }
                 MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait for events failed!");
             }
@@ -588,11 +599,13 @@ namespace mgi
             {
                 // TODO Enable staging caches
                 // TODO Yeah alignment please!
-                const auto wholeSize = std::accumulate(updates.begin(), updates.end(), size_t{0}, [](auto first, auto& t){ return t.size + first;});
+                const auto wholeSize = std::accumulate(updates.begin(), updates.end(), size_t{0}, [](auto first, auto &t)
+                                                       { return t.size + first; });
 
                 cl_int error{};
                 const auto stagingBuffer = clCreateBuffer(init.context.get(), toOCLMemoryType(MemoryType::Global), wholeSize, nullptr, &error);
-                OnExit stagingDestroy([&](){clRetainMemObject(stagingBuffer);});
+                OnExit stagingDestroy([&]()
+                                      { clRetainMemObject(stagingBuffer); });
                 MGI_DB_CHECK(error, "Failed to create staging buffer!");
 
                 std::vector<cl_event> events(updates.size());
@@ -600,20 +613,23 @@ namespace mgi
                                              { for(auto event : events) clRetainEvent(event); });
                 size_t offset = 0;
                 size_t idx = 0;
-                for(const auto& info : updates) {
+                for (const auto &info : updates)
+                {
                     MGI_DB_CHECK(clEnqueueWriteBuffer(queue, stagingBuffer, false, offset, info.size, info.data, 0, nullptr, &events[idx++]),
-                             "Could not enqueue write on allocate!");
+                                 "Could not enqueue write on allocate!");
                     offset += info.size;
                 }
                 MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait for events failed!");
-                for(auto event : events) clRetainEvent(event); 
+                for (auto event : events)
+                    clRetainEvent(event);
                 // TODO Check if this locking is smart!
                 std::lock_guard lockWrite(*perMemoryMutex[memory]);
                 offset = 0;
                 idx = 0;
-                for(const auto& info : updates) {
+                for (const auto &info : updates)
+                {
                     MGI_DB_CHECK(clEnqueueCopyBuffer(queue, stagingBuffer, buffer, offset, info.destinationOffset, info.size, 0, nullptr, &events[idx++]),
-                             "Copy buffer in allocation failed!");
+                                 "Copy buffer in allocation failed!");
                     offset += info.size;
                 }
                 MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Wait for events failed!");
@@ -623,12 +639,11 @@ namespace mgi
         std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy &strategy = {})
         {
             const auto queue = selectQueue();
-            // TODO Parameter tuning
-            static constexpr size_t WORK_GROUP_SIZE[3] = {1, 1, 1};
             cl_int error{};
             std::vector<Task> returnTasks(tasks.size());
             uint32_t index{};
             uint32_t dependencyAmount = (strategy.type == TaskStrategyType::OutOfOrder ? 0 : 1);
+            std::vector<cl_event> dependencyNext;
             for (const auto &task : tasks)
             {
                 // Cache is reused! To bad!
@@ -641,10 +656,21 @@ namespace mgi
                     MGI_DB_CHECK(clSetKernelArg(kernel, argID++, sizeof(cl_mem), &desc),
                                  "Could not set kernel %s arguments for descriptors!", task.function.c_str());
                 }
-                cl_int dep = (index == 0 ? 0 : dependencyAmount);
-                // Must be nullptr ... so we multiply with 0 or 1 ... to bad that the api is shit!
-                cl_event *dependencyChain = (cl_event *)((size_t)(returnTasks.data() + (index - 1)) * dep);
-                MGI_DB_CHECK(clEnqueueNDRangeKernel(queue, kernel, 3, nullptr, task.range, WORK_GROUP_SIZE, dep,
+                dependencyNext.clear();
+                if (strategy.type == TaskStrategyType::OutOfOrder && index != 0)
+                {
+                    dependencyNext.push_back(((cl_event *)returnTasks.data())[index - 1]);
+                }
+                if (!task.waitForTasks.empty())
+                {
+                    const auto last = dependencyNext.size();
+                    dependencyNext.resize(last + task.waitForTasks.size());
+                    std::copy((cl_event *)task.waitForTasks.data(),
+                              (cl_event *)task.waitForTasks.data() + task.waitForTasks.size(), dependencyNext.begin() + last);
+                }
+                // Must be nullptr ... to bad that the api is shit!
+                cl_event *dependencyChain = dependencyNext.empty() ? dependencyNext.data() : nullptr;
+                MGI_DB_CHECK(clEnqueueNDRangeKernel(queue, kernel, 3, nullptr, task.range, task.groupSizes, dependencyNext.size(),
                                                     dependencyChain, (cl_event *)(returnTasks.data() + index)),
                              "Could not enqueue kernel %s", task.function.c_str());
                 index++;
@@ -755,7 +781,10 @@ namespace mgi
 namespace mgi
 {
     inline int initMGI(const InitInfo &info = {}) { return 0; }
-    
-    struct DeferredAPI { int t; };
+
+    struct DeferredAPI
+    {
+        int t;
+    };
 }
 #endif

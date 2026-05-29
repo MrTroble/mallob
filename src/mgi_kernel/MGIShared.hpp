@@ -5,6 +5,9 @@ typedef unsigned int m_uint;
 
 #ifdef __cplusplus
 #include <atomic>
+#include <cmath>
+    using namespace std;
+
 extern "C" {
     struct uint2 {
         m_uint x;
@@ -16,13 +19,24 @@ extern "C" {
         inline uint2& operator^=(uint2 l) { x ^= l.x; y ^= l.y; return *this; }
     };
     inline uint2 operator*(m_uint l, uint2 o) { return { o.x*l, o.y*l}; }
-    using namespace std;
 
     typedef std::atomic<float> atomic_float;
 
     #define MGI_K_INLINE inline
 #else
     #define MGI_K_INLINE
+#endif
+
+#ifdef MGI_API_OCL
+#define MGI_GLOBAL global 
+#define MGI_LOCAL local 
+#define MGI_CONST constant
+#define MGI_PRIVATE private 
+#else
+#define MGI_GLOBAL  
+#define MGI_LOCAL  
+#define MGI_CONST 
+#define MGI_PRIVATE  
 #endif
 typedef uint2 m_uint2;
 
@@ -37,6 +51,11 @@ MGI_K_INLINE float mgiUintToFloat(m_uint x) {
     } u;
     u.a = 0x3f800000 | (x >> 9);
     return u.b - 1.f;
+}
+
+MGI_K_INLINE float mgiRNGInit(MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
+    rng->seed.x = x ^ (id << 16);
+    rng->seed.y = y ^ ((id + seedVal) << 16);
 }
 
 // returns random float between (0,1]
@@ -60,10 +79,35 @@ typedef struct __mgi_resolve_info {
     m_uint resolvedSize;
 } MGIResolveInfo;
 
-typedef struct __mgi_reservoir {
+typedef struct __mgi_atomic_reservoir {
     MGIResolveInfo resolve;
     atomic_float weight;
+} MGIAtomicReservoir;
+
+typedef struct __mgi_reservoir {
+    MGIResolveInfo resolve;
+    float weight;
 } MGIReservoir;
+
+MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+    float value = atomic_load(&reservior->weight);
+    while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight) != value)
+        value = atomic_load(&reservior->weight);
+    // Can we get rid of those compare exchanges
+    // Does this kill the probabilty? Look at the Markov Chain: Ergodisity even needed?
+    if((weight / (value + weight)) >= mgiRNGRndFloat(rng)) {
+        reservior->resolve = *resolve;
+    }
+}
+
+MGI_K_INLINE void mgiReserviorAddSample(MGI_PRIVATE MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+    reservior->weight += weight;
+    if((weight / reservior->weight) >= mgiRNGRndFloat(rng)) {
+        reservior->resolve = *resolve;
+    }
+}
+
+
 #ifdef __cplusplus
 }
 #endif
