@@ -165,7 +165,7 @@ namespace test
         }
 
         {
-            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}}); // Not resolutable
+            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}}); // Not resolvable
             MGIReservoir reservoir{{0}, 0};
             findResolventsReservoir(literals.data(), ends.data(), &reservoir);
             assert(reservoir.resolve.literal == 0);
@@ -176,7 +176,7 @@ namespace test
             assert(localResolve.literal == 0);
         }
         {
-            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}, {1, 2, 6}}); // Not
+            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}, {1, 2, 6}}); // 1 and 3 are resolvable
             MGIReservoir reservoir{{0}, 0};
             findResolventsReservoir(literals.data(), ends.data(), &reservoir);
             assert(reservoir.resolve.literal == 2);
