@@ -75,6 +75,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_IN int *clauses, MGI_IN m_uint *clau
         m_uint heuristic = difference;
         resolve.literal = 0;
         resolve.clauseTwo = i;
+        resolve.resolvedSize = 0;
         for (;;) // This calculates the heursitic and does merging
         {
             if (otherBegin == otherEnd || iter == currentEnd)
@@ -113,6 +114,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_IN int *clauses, MGI_IN m_uint *clau
                 heuristic++;
             }
         }
+        if(resolve.literal == 0) continue;
         resolve.resolvedSize = heuristic;
         float maxValue = 2000.0f; // TODO Get max number
         float weight = (1.0f / ((float)xSize)) * (1 - (resolve.resolvedSize / maxValue));

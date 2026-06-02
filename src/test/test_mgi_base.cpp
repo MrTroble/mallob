@@ -113,8 +113,24 @@ void testRoutine()
 
 namespace test
 {
-
 #include "mgi_kernel/resolution_kernel.cpp"
+
+    inline std::pair<std::vector<int>, std::vector<uint32_t>> generate(const std::vector<std::vector<int>> &values)
+    {
+        std::vector<int> assig;
+        std::vector<uint32_t> starts;
+        for (auto &vecs : values)
+        {
+            const auto current = assig.size();
+            starts.push_back(current);
+            assig.resize(current + vecs.size() + 1);
+            std::copy(vecs.begin(), vecs.end(), assig.begin() + current);
+            assig[current + vecs.size()] = 0;
+        }
+        starts.push_back(assig.size());
+        MGI_GSIZE_X = values.size() - 1;
+        return {assig, starts};
+    }
 
     void testResolutionKernel()
     {
@@ -130,7 +146,7 @@ namespace test
             clauses[i + elementsPerClaus + 1] = -(int)i - 1;
         }
 
-        std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2*elementsPerClaus+1};
+        std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2 * elementsPerClaus + 1};
         std::vector<MGIResolveInfo> resolves(2);
         findResolvents(clauses.data(), beginings.data(), resolves.data());
         MGIResolveInfo localResolve = resolves[0];
@@ -139,13 +155,35 @@ namespace test
         assert(localResolve.literal != 0);
         assert(std::abs(localResolve.literal) <= elementsPerClaus);
 
-        MGIReservoir reservoir;
-        findResolventsReservoir(clauses.data(), beginings.data(), &reservoir);
-        assert(reservoir.resolve.resolvedSize == 0);
-        assert(reservoir.resolve.literal != 0);
-        assert(reservoir.resolve.clauseOne == 0);
-        assert(reservoir.resolve.clauseTwo == 1);
+        {
+            MGIReservoir reservoir;
+            findResolventsReservoir(clauses.data(), beginings.data(), &reservoir);
+            assert(reservoir.resolve.resolvedSize == 0);
+            assert(reservoir.resolve.literal != 0);
+            assert(reservoir.resolve.clauseOne == 0);
+            assert(reservoir.resolve.clauseTwo == 1);
+        }
 
+        {
+            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}}); // Not resolutable
+            MGIReservoir reservoir{{0}, 0};
+            findResolventsReservoir(literals.data(), ends.data(), &reservoir);
+            assert(reservoir.resolve.literal == 0);
+            resolves.clear();
+            resolves.resize(2);
+            findResolvents(literals.data(), ends.data(), resolves.data());
+            MGIResolveInfo localResolve = resolves[0];
+            assert(localResolve.literal == 0);
+        }
+        {
+            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}, {1, 2, 6}}); // Not
+            MGIReservoir reservoir{{0}, 0};
+            findResolventsReservoir(literals.data(), ends.data(), &reservoir);
+            assert(reservoir.resolve.literal == 2);
+            assert(reservoir.resolve.resolvedSize == 3);
+            assert(reservoir.resolve.clauseOne == 0);
+            assert(reservoir.resolve.clauseTwo == 2);
+        }
         LOG(V2_INFO, "End Kernel TESTS on HOST!\n");
     }
 }
