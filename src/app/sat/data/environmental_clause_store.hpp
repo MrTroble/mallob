@@ -3,6 +3,7 @@
 
 #include "robin_map.h"
 #include "robin_set.h"
+#include "util/hashing.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/sys/proc.hpp"
@@ -43,13 +44,12 @@ public:
         }
     }
 
-    const std::vector<int>& getSelection(int maxLits) {
+    const std::vector<int>& getSelection(int maxLits, int nbTries = 10) {
         auto lock = mtx.getLock();
         output.clear();
         selectedClauses.clear();
         selectedVolume = 0;
 
-        int nbTries = 10;
         while (selectedVolume < 0.9 * maxLits && nbTries > 0) {
             int var = (int) std::round(rng.randomInRange(1, nbVars));
             addEnvironment(var, maxLits - selectedVolume);
@@ -67,7 +67,7 @@ public:
 
 private:
     std::vector<int> output;
-    tsl::robin_set<int> selectedClauses; // positions to clauses - no duplicates
+    tsl::robin_set<int, IntHasher> selectedClauses; // positions to clauses - no duplicates
     int selectedVolume = 0; // # selected literals in total
 
     void addEnvironment(int var, int maxLits) {
@@ -81,6 +81,10 @@ private:
 
         // outer loop
         while (!stack.empty() && selectedVolume < maxLits) {
+            // randomly shuffle processing order of clauses
+            random_shuffle(stack.data(), stack.size(), [&]() {
+                return rng.randomInRange(0, 1);
+            });
 
             // process all clauses of this iteration
             while (!stack.empty()) {
@@ -116,6 +120,7 @@ private:
             // swap in stack for next iteration
             stack = std::move(newStack);
             newStack.clear();
+
         }
     }
 
