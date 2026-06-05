@@ -95,7 +95,7 @@ void testRoutine()
 
     LOG(V2_INFO, "GPU Clause Interface test\n");
 
-    GpuClauseInterface gpuInterface(deferred);
+    GpuClauseInterface gpuInterface(deferred, Parameters());
     // Test clauses: All positiv + All negativ
     const size_t elementsPerClaus = 16;
     std::vector<int> clauses(2 * elementsPerClaus + 1);
