@@ -17,7 +17,8 @@
         "MALLOB_USE_ASAN": "1",
         "MALLOB_SUBPROC_DISPATCH_PATH": "\\\"build/\\\"",
         "MALLOB_APP_SAT": "1",
-        "MALLOB_ASSERT": "2"
+        "MALLOB_ASSERT": "2",
+        "MALLOB_MGI_TEST_COMPILE": true
       },
       "condition": {
         "type": "equals",

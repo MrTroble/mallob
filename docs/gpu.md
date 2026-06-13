@@ -62,7 +62,7 @@ Provided the `MALLOB_LOG_VERBOSITY` is set correctly (>=debug).
 |Flag|Usage|Default|
 |-|-|-|
 |`MALLOB_MGI_OCL_LAYERS`| Automatically download and add a compile target for the OpenCL validation layers. Needs environment configuration. This is automatically configured if the preset is used | On
-|`MALLOB_MGI_NO_TEST_COMPILE`| Disable clang OpenCL-C++ to SPIR-V compiler that automatically run to check your kernels for errors. | Off
+|`MALLOB_MGI_TEST_COMPILE`| Enable clang OpenCL-C++ to SPIR-V compiler that automatically run to check your kernels for errors. | Off (On in preset)
 
 ## Development
 
