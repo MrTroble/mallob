@@ -29,14 +29,14 @@ extern "C" {
 
     #ifdef MGI_API_OCL
     #define MGI_GLOBAL global 
-    #define MGI_LOCAL local 
+    #define MGI_SHARED local 
     #define MGI_CONST const constant
-    #define MGI_PRIVATE private 
+    #define MGI_LOCAL private 
     #else
     #define MGI_GLOBAL  
-    #define MGI_LOCAL  
+    #define MGI_SHARED  
     #define MGI_CONST 
-    #define MGI_PRIVATE  
+    #define MGI_LOCAL  
     #endif
     
 typedef uint2 m_uint2;
@@ -101,7 +101,7 @@ MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* res
     }
 }
 
-MGI_K_INLINE void mgiReserviorAddSample(MGI_PRIVATE MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+MGI_K_INLINE void mgiReserviorAddSample(MGI_LOCAL MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     reservior->weight += weight;
     if((weight / reservior->weight) >= mgiRNGRndFloat(rng)) {
         reservior->resolve = *resolve;

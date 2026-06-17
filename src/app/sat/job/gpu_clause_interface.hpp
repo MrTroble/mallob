@@ -22,6 +22,8 @@ friend InterfaceTestGpuClause;
 private:
     mgi::DeferredAPI& _mgi_api;
     mgi::Kernel resolutionKernel;
+    mgi::Task lastTask;
+    std::vector<mgi::Task> tasksToRetire;
 
     const int pageSize {65536};
 
@@ -51,7 +53,17 @@ private:
                                    AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes), // CTAD is bad in 17 ... :(
                                    AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos) };
         const auto memories = _mgi_api.allocate(allocations);
-        
+        // TODO Reuse allocation
+
+        TaskInfo taskInfo{{}, TaskType::Long, {clauseAmount, sizeOfY, 1}};
+        taskInfo.kernel = this->resolutionKernel;
+        taskInfo.function = "findResolventsReservoir";
+        taskInfo.descriptor.memory = memories;
+        if(lastTask) {
+            taskInfo.waitForTasks.push_back(lastTask);
+            tasksToRetire.push_back(lastTask);
+        }
+        lastTask = _mgi_api.queueTasks(from(taskInfo)).back();
     }
 
 public:

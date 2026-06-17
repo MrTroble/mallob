@@ -54,8 +54,7 @@ namespace mgi
         template <typename G>
         MGISpan(const G &holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
 
-        template <typename G>
-        MGISpan(const G* ptr, size_t size) : beginPtr(ptr), endPtr(ptr + size) {}
+        MGISpan(T* ptr, size_t size) : beginPtr(ptr), endPtr(ptr + size) {}
 
         size_t size() const
         {
@@ -153,6 +152,11 @@ namespace mgi
         }
     };
 
+}
+
+template<class T>
+inline mgi::span<T> from(T& t) {
+    return mgi::span<T>(&t, 1);
 }
 
 // TODO THIS IS STUPID REMOVE WITH C++20 Conecpts

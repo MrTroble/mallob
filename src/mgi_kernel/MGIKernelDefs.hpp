@@ -3,9 +3,12 @@
 
 #ifdef MGI_API_OCL
 #define MGI_KERNEL __kernel
-#define MGI_IN __constant const
-#define MGI_OUT __global
-#define MGI_INOUT __global
+#ifndef MGI_GLOBAL
+    #define MGI_GLOBAL global 
+    #define MGI_SHARED local 
+    #define MGI_CONST const constant
+    #define MGI_LOCAL private 
+#endif
 #define MGI_GID_X get_global_id(0)
 #define MGI_GID MGI_GID_X
 #define MGI_GID_Y get_global_id(1)
@@ -25,10 +28,14 @@ static uint32_t __mgi__yID = 0;
 static uint32_t __mgi__xSize = 1;
 static uint32_t __mgi__ySize = 1;
 
+#ifndef MGI_GLOBAL
+    #define MGI_GLOBAL  
+    #define MGI_LOCAL  
+    #define MGI_CONST 
+    #define MGI_PRIVATE  
+#endif
+
 #define MGI_KERNEL
-#define MGI_IN
-#define MGI_OUT
-#define MGI_INOUT
 #define MGI_GID_X __mgi__xID
 #define MGI_GID_Y __mgi__yID
 #define MGI_GID MGI_GID_X

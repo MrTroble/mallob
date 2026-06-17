@@ -12,7 +12,17 @@
 using namespace mgi;
 
 class InterfaceTestGpuClause {
-    
+public:
+    GpuClauseInterface interface;
+
+    void testGpuPush(mgi::span<const int> value) {
+        interface.pushClausesToGpu(value);
+    }
+
+    void testWaitForTasks() {
+        interface._mgi_api.waitTasks(from(interface.lastTask));
+        interface._mgi_api.waitTasks(interface.tasksToRetire);
+    }
 };
 
 void testRoutine()
@@ -99,7 +109,9 @@ void testRoutine()
 
     LOG(V2_INFO, "GPU Clause Interface test\n");
 
-    GpuClauseInterface gpuInterface(deferred, Parameters());
+    ProcessWideThreadPool::init(16); // TODO Revisit this is a test
+    InterfaceTestGpuClause gpuInterface{ GpuClauseInterface{deferred, Parameters()}};
+
     // Test clauses: All positiv + All negativ
     const size_t elementsPerClaus = 16;
     std::vector<int> clauses(2 * elementsPerClaus + 1);
@@ -110,7 +122,8 @@ void testRoutine()
         clauses[i + elementsPerClaus + 1] = -(int)i - 1;
     }
     assert(GpuClauseInterface::canUseGPU());
-    gpuInterface.insertClausesFromSharing(clauses);
+    gpuInterface.testGpuPush(clauses);
+    gpuInterface.testWaitForTasks();
 
     LOG(V2_INFO, "Finished Clause Interface test\n");
 }
