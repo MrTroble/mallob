@@ -161,5 +161,11 @@ private:
     inline mgi::Memory getFromCacheOr();
 
     // TODO(Nico) implement fetch
-    std::vector<int> fetchClausesFromGpu() {return {};}
+    // Should be called in the same thread as push
+    // Not thread safe!
+    std::vector<int> fetchClausesFromGpu() {
+        _mgi_api.waitTasks(from(lastTask));
+        
+        return {};
+    }
 };

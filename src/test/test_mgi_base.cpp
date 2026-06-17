@@ -20,6 +20,8 @@ public:
     }
 
     void testWaitForTasks() {
+        const auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
+        LOG(V2_INFO, "Status: %d!\n", status);
         if(interface.lastTask)
             interface._mgi_api.waitTasks(from(interface.lastTask));
         if(!interface.tasksToRetire.empty())
