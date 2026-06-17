@@ -11,6 +11,10 @@
 
 using namespace mgi;
 
+class InterfaceTestGpuClause {
+    
+};
+
 void testRoutine()
 {
     DeferredAPI deferred = initMGI();

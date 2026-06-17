@@ -12,11 +12,13 @@
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/data/environmental_clause_store.hpp"
 
+class InterfaceTestGpuClause;
+
 // Manages data flow from and to the GPU.
 // Owned by ForkedSatJob (same life scope as the DeferredAPI object),
 // supplied to AnytimeSatClauseCommunicator by reference.
 class GpuClauseInterface {
-
+friend InterfaceTestGpuClause;
 private:
     mgi::DeferredAPI& _mgi_api;
     mgi::Kernel resolutionKernel;
