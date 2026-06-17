@@ -21,6 +21,8 @@ class GpuClauseInterface {
 friend InterfaceTestGpuClause;
 private:
     mgi::DeferredAPI& _mgi_api;
+    StaticClauseStore<true> _post_buffer;
+    
     mgi::Kernel resolutionKernel;
     mgi::Task lastTask;
     std::vector<mgi::Task> tasksToRetire;
@@ -66,14 +68,18 @@ private:
         lastTask = _mgi_api.queueTasks(from(taskInfo)).back();
     }
 
+    bool useBackgroundThreads = true;
 public:
-    GpuClauseInterface(mgi::DeferredAPI& mgiApi, const Parameters& params) : _mgi_api(mgiApi),
+    GpuClauseInterface(mgi::DeferredAPI& mgiApi, const Parameters& params, bool useBackgroundThreads = true) : _mgi_api(mgiApi),
             _post_buffer(params, false, 256, true, 1<<20) {
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
-        launchBackgroundThreads();
+        this->useBackgroundThreads = useBackgroundThreads;
+        if(useBackgroundThreads)
+            launchBackgroundThreads();
     }
     ~GpuClauseInterface() {
-        joinBackgroundThreads();
+        if(useBackgroundThreads)
+            joinBackgroundThreads();
     }
 
     inline constexpr static bool canUseGPU() {
@@ -107,7 +113,6 @@ private:
     bool _terminate {false};
 
     EnvironmentalClauseStore _pre_buffer;
-    StaticClauseStore<true> _post_buffer;
 
     void launchBackgroundThreads() {
         if (!canUseGPU()) return;

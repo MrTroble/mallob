@@ -20,8 +20,10 @@ public:
     }
 
     void testWaitForTasks() {
-        interface._mgi_api.waitTasks(from(interface.lastTask));
-        interface._mgi_api.waitTasks(interface.tasksToRetire);
+        if(interface.lastTask)
+            interface._mgi_api.waitTasks(from(interface.lastTask));
+        if(!interface.tasksToRetire.empty())
+            interface._mgi_api.waitTasks(interface.tasksToRetire);
     }
 };
 
@@ -109,8 +111,7 @@ void testRoutine()
 
     LOG(V2_INFO, "GPU Clause Interface test\n");
 
-    ProcessWideThreadPool::init(16); // TODO Revisit this is a test
-    InterfaceTestGpuClause gpuInterface{ GpuClauseInterface{deferred, Parameters()}};
+    InterfaceTestGpuClause gpuInterface{ GpuClauseInterface{deferred, Parameters(), false}};
 
     // Test clauses: All positiv + All negativ
     const size_t elementsPerClaus = 16;
