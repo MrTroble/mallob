@@ -11,20 +11,23 @@
 
 using namespace mgi;
 
-class InterfaceTestGpuClause {
+class InterfaceTestGpuClause
+{
 public:
     GpuClauseInterface interface;
 
-    void testGpuPush(mgi::span<const int> value) {
+    void testGpuPush(mgi::span<const int> value)
+    {
         interface.pushClausesToGpu(value);
     }
 
-    void testWaitForTasks() {
+    void testWaitForTasks()
+    {
         const auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
         LOG(V2_INFO, "Status: %d!\n", status);
-        if(interface.lastTask)
+        if (interface.lastTask)
             interface._mgi_api.waitTasks(from(interface.lastTask));
-        if(!interface.tasksToRetire.empty())
+        if (!interface.tasksToRetire.empty())
             interface._mgi_api.waitTasks(interface.tasksToRetire);
     }
 };
@@ -113,7 +116,7 @@ void testRoutine()
 
     LOG(V2_INFO, "GPU Clause Interface test\n");
 
-    InterfaceTestGpuClause gpuInterface{ GpuClauseInterface{deferred, Parameters(), false}};
+    InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
 
     // Test clauses: All positiv + All negativ
     const size_t elementsPerClaus = 16;
@@ -148,7 +151,7 @@ namespace test
             assig[current + vecs.size()] = 0;
         }
         starts.push_back(assig.size());
-        MGI_GSIZE_X = values.size() - 1;
+        MGI_GSIZE_X = values.size();
         return {assig, starts};
     }
 
@@ -175,6 +178,14 @@ namespace test
         assert(localResolve.literal != 0);
         assert(std::abs(localResolve.literal) <= elementsPerClaus);
 
+        MGI_GSIZE_X = 2;
+        MGI_GSIZE_Y = 1;
+        MGI_GID_X = 0;
+
+        /*
+         * Self note it  is ySize = floor(n/2)
+         */
+
         {
             MGIReservoir reservoir;
             findResolventsReservoir(clauses.data(), beginings.data(), &reservoir);
@@ -185,7 +196,7 @@ namespace test
         }
 
         {
-            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}}); // Not resolvable
+            auto [literals, ends] = generate({{1, -2, 3}, {1, 5, 6}}); // Not resolvable
             MGIReservoir reservoir{{0}, 0};
             findResolventsReservoir(literals.data(), ends.data(), &reservoir);
             assert(reservoir.resolve.literal == 0);
@@ -196,13 +207,41 @@ namespace test
             assert(localResolve.literal == 0);
         }
         {
-            auto [literals, ends] = generate({{1,-2, 3}, {1, 5, 6}, {1, 2, 6}}); // 1 and 3 are resolvable
-            MGIReservoir reservoir{{0}, 0};
-            findResolventsReservoir(literals.data(), ends.data(), &reservoir);
-            assert(reservoir.resolve.literal == 2);
-            assert(reservoir.resolve.resolvedSize == 3);
-            assert(reservoir.resolve.clauseOne == 0);
-            assert(reservoir.resolve.clauseTwo == 2);
+            MGI_GSIZE_X = 3;
+            MGI_GSIZE_Y = 1;
+            auto [literals, ends] = generate({{1, -2, 3}, {1, 5, 6}, {1, 2, 6}}); // 1 and 3 are resolvable
+            std::array<MGIReservoir, 3> reservoir;
+            for (size_t i = 0; i < reservoir.size(); i++)
+            {
+                MGI_GID_X = i;
+                findResolventsReservoir(literals.data(), ends.data(), reservoir.data());
+            }
+            assert(reservoir[2].resolve.literal == 2);
+            assert(reservoir[2].resolve.resolvedSize == 3);
+            assert(reservoir[2].resolve.clauseOne == 2);
+            assert(reservoir[2].resolve.clauseTwo == 0);
+
+            assert(reservoir[0].resolve.literal == 0);
+            assert(reservoir[1].resolve.literal == 0);
+        }
+        {
+            auto [literals, ends] = generate({{1, -2, 3}, {1, 2, 6}}); // 1 and 3 are resolvable
+            MGI_GSIZE_X = 2;
+            MGI_GSIZE_Y = 1;
+            MGI_GID_X = 0;
+            std::array<MGIReservoir, 2> reservoir;
+            findResolventsReservoir(literals.data(), ends.data(), reservoir.data());
+            MGI_GID_X = 1;
+            findResolventsReservoir(literals.data(), ends.data(), reservoir.data());
+            assert(reservoir[0].resolve.literal == 2);
+            assert(reservoir[0].resolve.resolvedSize == 3);
+            assert(reservoir[0].resolve.clauseOne == 0);
+            assert(reservoir[0].resolve.clauseTwo == 1);
+
+            assert(reservoir[1].resolve.literal == 2);
+            assert(reservoir[1].resolve.resolvedSize == 3);
+            assert(reservoir[1].resolve.clauseOne == 1);
+            assert(reservoir[1].resolve.clauseTwo == 0);
         }
         LOG(V2_INFO, "End Kernel TESTS on HOST!\n");
     }

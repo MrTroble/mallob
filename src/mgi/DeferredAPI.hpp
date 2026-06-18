@@ -102,6 +102,12 @@ namespace mgi
         }
     }
 
+    struct MemoryCopyInfo {
+        size_t size = 0;
+        size_t srcOffset = 0;
+        size_t destOffset = 0;
+    };
+
     struct AllocationInfo
     {
         Extension extensions;
@@ -702,6 +708,14 @@ namespace mgi
                 status[index++] = toTaskStatus(value);
             }
             return status;
+        }
+    
+        void copyMemory(Memory m1, Memory m2, span<const MemoryCopyInfo> copyInfos) {
+
+        }
+
+        inline void freeObj(Memory memory) {
+            MGI_DB_CHECK(clRetainMemObject((cl_mem)memory.internal), "Free failed!");
         }
     };
 

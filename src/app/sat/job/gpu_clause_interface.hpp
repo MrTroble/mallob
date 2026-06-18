@@ -26,6 +26,8 @@ private:
     mgi::Kernel resolutionKernel;
     mgi::Task lastTask;
     std::vector<mgi::Task> tasksToRetire;
+    size_t lastClauseAmount = 0;
+    mgi::Memory currentReservoir;
 
     const int pageSize {65536};
 
@@ -50,11 +52,20 @@ private:
 
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)ceil((float)(clauseAmount) / 2.0f);
-        const auto sizeOfResolventInfos = sizeOfY * clauseAmount * sizeof(MGIResolveInfo);
+        const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIResolveInfo);
         std::array allocations = { AllocationInfo::from(MemoryType::Constant, values),
                                    AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes), // CTAD is bad in 17 ... :(
-                                   AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos) };
-        const auto memories = _mgi_api.allocate(allocations);
+                                    };
+        auto memories = _mgi_api.allocate(allocations);
+        if(lastClauseAmount < clauseAmount) { // Reallocate after size changes
+            const auto realloc = AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos);
+            const auto reservoirMemory = _mgi_api.allocate(from(realloc));
+            // TODO COPY OLD
+            if(!currentReservoir) _mgi_api.freeObj(currentReservoir);
+            currentReservoir = reservoirMemory.back();
+            lastClauseAmount = clauseAmount;
+        }
+        memories.push_back(currentReservoir);
         // TODO Reuse allocation
 
         TaskInfo taskInfo{{}, TaskType::Long, {clauseAmount, sizeOfY, 1}};

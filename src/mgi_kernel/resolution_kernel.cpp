@@ -55,26 +55,28 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
     MGI_LOCAL MGIRng rng;
     mgiRNGInit(&rng, x, 0, 1, 117007);
 
-    // Shuffle reservoirs
+    // TODO Use LOCAL reservoir and ONLY MERGE AT THE END! Shuffle reservoirs
     MGI_LOCAL MGIReservoir currentReservoir = toResolve[x];
     currentReservoir.weight = 0;
     currentReservoir.resolve.literal = 0;
     int literal = 0;
-    const m_uint xSize = MGI_GSIZE_X; // Assume K - 1
+    const m_uint amountOfOtherClauses = MGI_GSIZE_Y;
     MGI_CONST int *currentBegin = clauses + position;
     MGI_CONST int *currentEnd = currentBegin + sizeOfClause;
     MGI_LOCAL MGIResolveInfo resolve;
     resolve.clauseOne = x;
-    for (m_uint i = x + 1; i <= xSize; i++)
+    const m_uint divider = MGI_GSIZE_X;
+    for (m_uint i = 0; i < amountOfOtherClauses; i++)
     {
-        MGI_CONST int *otherBegin = clauses + clausesStarts[i];
-        MGI_CONST int *otherEnd = clauses + clausesStarts[i + 1];
+        const m_uint index = (x + i + 1) % divider;
+        MGI_CONST int *otherBegin = clauses + clausesStarts[index];
+        MGI_CONST int *otherEnd = clauses + clausesStarts[index + 1];
         MGI_CONST int *iter = currentBegin;
         m_uint sizeOfOther = otherEnd - otherBegin;
         int difference = sizeOfClause - sizeOfOther;
         m_uint heuristic = difference;
         resolve.literal = 0;
-        resolve.clauseTwo = i;
+        resolve.clauseTwo = index;
         resolve.resolvedSize = 0;
         for (;;) // This calculates the heursitic and does merging
         {
@@ -117,7 +119,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
         if(resolve.literal == 0) continue;
         resolve.resolvedSize = heuristic;
         float maxValue = 2000.0f; // TODO Get max number
-        float weight = (1.0f / ((float)xSize)) * (1 - (resolve.resolvedSize / maxValue));
+        float weight = (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
         mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
     }
 
