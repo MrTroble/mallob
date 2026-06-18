@@ -484,10 +484,12 @@ namespace mgi
                     events.push_back(event);
                 }
             }
-            MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Events failed!");
-            for (auto event : events)
-                clRetainEvent(event);
-            events.clear();
+            if(!events.empty()) {
+                MGI_DB_CHECK(clWaitForEvents(events.size(), events.data()), "Write/Map Events failed!");
+                for (auto event : events)
+                    clRetainEvent(event);
+                events.clear();
+            }
 
             std::vector<std::pair<Memory, std::shared_mutex *>> mutexArray(subBuffers.size());
             size_t index = 0;

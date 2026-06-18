@@ -61,7 +61,7 @@ private:
             const auto realloc = AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos);
             const auto reservoirMemory = _mgi_api.allocate(from(realloc));
             // TODO COPY OLD
-            if(!currentReservoir) _mgi_api.freeObj(currentReservoir);
+            if(currentReservoir) _mgi_api.freeObj(currentReservoir);
             currentReservoir = reservoirMemory.back();
             lastClauseAmount = clauseAmount;
         }
