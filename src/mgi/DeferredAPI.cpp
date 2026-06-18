@@ -1,4 +1,5 @@
 #include "DeferredAPI.hpp"
+#include "mgi_kernel/MGIShared.hpp"
 
 namespace mgi
 {

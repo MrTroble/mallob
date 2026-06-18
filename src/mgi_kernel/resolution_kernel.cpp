@@ -66,6 +66,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
     MGI_LOCAL MGIResolveInfo resolve;
     resolve.clauseOne = x;
     const m_uint divider = MGI_GSIZE_X;
+    printf("Test Hello from kernel\n");
     for (m_uint i = 0; i < amountOfOtherClauses; i++)
     {
         const m_uint index = (x + i + 1) % divider;

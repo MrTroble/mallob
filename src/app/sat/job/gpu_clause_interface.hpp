@@ -51,11 +51,11 @@ private:
         prefixes.push_back(std::distance(values.begin(), values.end()));
 
         // We need n^2 / 2 to compare each to each
-        const auto sizeOfY = (size_t)ceil((float)(clauseAmount) / 2.0f);
+        const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIResolveInfo);
         std::array allocations = { AllocationInfo::from(MemoryType::Constant, values),
-                                   AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes), // CTAD is bad in 17 ... :(
-                                    };
+                                   AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
+                                 };
         auto memories = _mgi_api.allocate(allocations);
         if(lastClauseAmount < clauseAmount) { // Reallocate after size changes
             const auto realloc = AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos);

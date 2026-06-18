@@ -90,6 +90,27 @@ typedef struct __mgi_reservoir {
     float weight;
 } MGIReservoir;
 
+#define MGI_MAX_DEBUG_MESSAGE_SPACE 1024
+
+typedef struct __mgi_debug_helper {
+    char messageBuffer[MGI_MAX_DEBUG_MESSAGE_SPACE];
+    m_uint lastIndex;
+    m_uint overflowMessageCount;
+} MGIDebugHelper;
+
+MGI_K_INLINE void __internal_print(MGIDebugHelper* helper, const char* message) {
+    while (*message != 0)
+    {
+        if(helper->lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+            helper->overflowMessageCount++;
+            break;
+        }
+        helper->messageBuffer[helper->lastIndex++] = *message++;
+    }
+}
+
+#define MGI_DEBUG_LOG(message) __internal_print(__pDebugHelper, message)
+
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);
     while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight) != value)

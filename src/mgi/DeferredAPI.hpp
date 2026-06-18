@@ -696,6 +696,9 @@ namespace mgi
         void waitTasks(span<const Task> tasks)
         {
             MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
+            #ifdef DEBUG
+            MGI_DB_CHECK(clFlush(selectQueue()), "Flush failed!");
+            #endif
         }
 
         std::vector<TaskStatus> getStatus(span<const Task> tasks)
