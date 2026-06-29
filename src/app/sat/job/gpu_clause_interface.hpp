@@ -60,7 +60,7 @@ private:
 
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
-        const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIResolveInfo);
+        const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
         std::array allocations = { AllocationInfo::from(MemoryType::Constant, values),
                                    AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
                                  };

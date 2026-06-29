@@ -30,6 +30,14 @@ public:
         if (!interface.tasksToRetire.empty())
             interface._mgi_api.waitTasks(interface.tasksToRetire);
     }
+    
+    std::vector<MGIReservoir> testAfterPush(size_t count)
+    {
+        std::vector<MGIReservoir> copyRes(count);
+        const auto readLock = interface._mgi_api.readMemory(interface.currentReservoir, from(ReadInfo{sizeof(MGIReservoir) * count}));
+        std::copy((MGIReservoir*)readLock.ptr[0], (MGIReservoir*)readLock.ptr[0] + count, copyRes.begin());
+        return copyRes;
+    }
 };
 
 void testRoutine()
@@ -130,6 +138,13 @@ void testRoutine()
     assert(GpuClauseInterface::canUseGPU());
     gpuInterface.testGpuPush(clauses);
     gpuInterface.testWaitForTasks();
+
+    LOG(V2_INFO, "Finished GPU Tasks\n");
+
+    const auto reservoirsLast = gpuInterface.testAfterPush(2);
+    assert(reservoirsLast[0].resolve.clauseOne == 0);
+    assert(reservoirsLast[0].resolve.clauseTwo == 1);
+    assert(reservoirsLast[0].resolve.literal != 0);
 
     LOG(V2_INFO, "Finished Clause Interface test\n");
 }
