@@ -66,6 +66,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST MGIInfo* info, MGI_CONST int *
     MGI_LOCAL MGIResolveInfo resolve;
     resolve.clauseOne = x;
     const m_uint divider = MGI_GSIZE_X;
+    const float maxValue = info->maxClauseSize;
     for (m_uint i = 0; i < amountOfOtherClauses; i++)
     {
         const m_uint index = (x + i + 1) % divider;
@@ -112,7 +113,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST MGIInfo* info, MGI_CONST int *
             }
         }
         resolve.resolvedSize = heuristic;
-        float maxValue = 2000.0f; // TODO Get max number
         float weight = (resolve.literal == 0 ? 0:1) * (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
         mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
     }

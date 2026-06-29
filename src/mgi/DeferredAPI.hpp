@@ -227,6 +227,12 @@ namespace mgi
         {
             return BufferUpdateInfo{(void *)value.data(), value.size_bytes(), offset};
         }
+
+        template <typename T>
+        constexpr static BufferUpdateInfo from(span<T> value, size_t offset = 0)
+        {
+            return BufferUpdateInfo{(void *)value.data(), value.size_bytes(), offset};
+        }
     };
 
     struct MemoryDescriptor

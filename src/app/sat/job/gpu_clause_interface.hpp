@@ -42,13 +42,18 @@ private:
         // THIS IS BULLSHIT!
         std::vector<uint32_t> prefixes;
         prefixes.push_back(0);
+        uint32_t maxSize = 0;
         for (auto i = std::find(values.begin(), values.end(), 0); 
                   i != values.end(); i = std::find(i + 1, values.end(), 0))
         {
             const auto last = prefixes.back();
             const auto current = std::distance(values.begin(), i);
             prefixes.push_back(current);
+            maxSize = std::max(maxSize, (uint32_t)(current - last));
+
         }
+        maxSize *= maxSize; // Could be quadratic
+
         const auto clauseAmount = prefixes.size();
         // Past the end
         prefixes.push_back(std::distance(values.begin(), values.end()));
@@ -68,6 +73,7 @@ private:
             currentReservoir = reservoirMemory.back();
             lastClauseAmount = clauseAmount;
         }
+        _mgi_api.writeMemory(mgiInfo, from(BufferUpdateInfo::from(from(maxSize))));
         memories.insert(memories.begin(), mgiInfo);
         memories.push_back(currentReservoir);
         // TODO Reuse allocation
