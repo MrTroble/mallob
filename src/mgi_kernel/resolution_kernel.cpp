@@ -46,7 +46,7 @@ MGI_KERNEL void findResolvents(MGI_CONST int *clauses, MGI_CONST m_uint *clauses
 }
 
 // TODO Prefetching
-MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
+MGI_KERNEL void findResolventsReservoir(MGI_CONST MGIInfo* info, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
 {
     const m_uint x = MGI_GID_X;
     const m_uint position = clausesStarts[x];
@@ -66,7 +66,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
     MGI_LOCAL MGIResolveInfo resolve;
     resolve.clauseOne = x;
     const m_uint divider = MGI_GSIZE_X;
-    printf("Test Hello from kernel\n");
     for (m_uint i = 0; i < amountOfOtherClauses; i++)
     {
         const m_uint index = (x + i + 1) % divider;
@@ -79,19 +78,14 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
         resolve.literal = 0;
         resolve.clauseTwo = index;
         resolve.resolvedSize = 0;
-        for (;;) // This calculates the heursitic and does merging
+        for (;
+             !(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
         {
-            if (otherBegin == otherEnd || iter == currentEnd)
-                break;
             int l1 = *iter;
             int l2 = *otherBegin;
+            // TODO Make this mathematical
             if (l1 == -l2)
             {
-                if (resolve.literal != 0)
-                {
-                    heuristic = 0;
-                    break;
-                }
                 resolve.literal = abs(l1);
                 iter++;
                 otherBegin++;
@@ -117,10 +111,9 @@ MGI_KERNEL void findResolventsReservoir(MGI_CONST int *clauses, MGI_CONST m_uint
                 heuristic++;
             }
         }
-        if(resolve.literal == 0) continue;
         resolve.resolvedSize = heuristic;
         float maxValue = 2000.0f; // TODO Get max number
-        float weight = (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
+        float weight = (resolve.literal == 0 ? 0:1) * (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
         mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
     }
 

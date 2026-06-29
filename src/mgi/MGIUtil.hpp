@@ -159,6 +159,12 @@ inline mgi::span<T> from(T& t) {
     return mgi::span<T>(&t, 1);
 }
 
+template<class T>
+inline mgi::span<const T> from(const T& t) {
+    return mgi::span<const T>(&t, 1);
+}
+
+
 // TODO THIS IS STUPID REMOVE WITH C++20 Conecpts
 // THIS IS DOUBLE STUPID BC WE NEED TO SEPERATLY DEFINE == FOR EACH NO TEMPLATE SUPPORT!
 #define MGI_DEFINE_TYPE_HASH(t1)                                                              \

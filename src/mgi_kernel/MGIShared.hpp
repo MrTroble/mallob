@@ -98,6 +98,11 @@ typedef struct __mgi_debug_helper {
     m_uint overflowMessageCount;
 } MGIDebugHelper;
 
+typedef struct __mgi_info {
+    m_uint maxClauseSize;
+    MGIDebugHelper __pDebugHelper;
+} MGIInfo;
+
 MGI_K_INLINE void __internal_print(MGIDebugHelper* helper, const char* message) {
     while (*message != 0)
     {
@@ -109,7 +114,7 @@ MGI_K_INLINE void __internal_print(MGIDebugHelper* helper, const char* message) 
     }
 }
 
-#define MGI_DEBUG_LOG(message) __internal_print(__pDebugHelper, message)
+#define MGI_DEBUG_LOG(message) __internal_print(info->__pDebugHelper, message)
 
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);

@@ -28,6 +28,7 @@ private:
     std::vector<mgi::Task> tasksToRetire;
     size_t lastClauseAmount = 0;
     mgi::Memory currentReservoir;
+    mgi::Memory mgiInfo;
 
     const int pageSize {65536};
 
@@ -44,7 +45,9 @@ private:
         for (auto i = std::find(values.begin(), values.end(), 0); 
                   i != values.end(); i = std::find(i + 1, values.end(), 0))
         {
-            prefixes.push_back(std::distance(values.begin(), i) + 1);
+            const auto last = prefixes.back();
+            const auto current = std::distance(values.begin(), i);
+            prefixes.push_back(current);
         }
         const auto clauseAmount = prefixes.size();
         // Past the end
@@ -65,6 +68,7 @@ private:
             currentReservoir = reservoirMemory.back();
             lastClauseAmount = clauseAmount;
         }
+        memories.insert(memories.begin(), mgiInfo);
         memories.push_back(currentReservoir);
         // TODO Reuse allocation
 
@@ -83,7 +87,9 @@ private:
 public:
     GpuClauseInterface(mgi::DeferredAPI& mgiApi, const Parameters& params, bool useBackgroundThreads = true) : _mgi_api(mgiApi),
             _post_buffer(params, false, 256, true, 1<<20) {
+        using namespace mgi;
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
+        mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Constant, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
         if(useBackgroundThreads)
             launchBackgroundThreads();
