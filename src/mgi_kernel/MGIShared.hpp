@@ -96,6 +96,7 @@ typedef struct __mgi_debug_helper {
     char messageBuffer[MGI_MAX_DEBUG_MESSAGE_SPACE];
     m_uint lastIndex;
     m_uint overflowMessageCount;
+    atomic_flag flag;
 } MGIDebugHelper;
 
 typedef struct __mgi_info {
@@ -103,18 +104,24 @@ typedef struct __mgi_info {
     MGIDebugHelper __pDebugHelper;
 } MGIInfo;
 
-MGI_K_INLINE void __internal_print(MGIDebugHelper* helper, const char* message) {
-    while (*message != 0)
+MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST char* message) {
+    while(!atomic_flag_test_and_set(&helper->flag));
+    while (*message != 0 && helper->lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
     {
         if(helper->lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
             helper->overflowMessageCount++;
-            break;
+        } else {
+            helper->messageBuffer[helper->lastIndex++] = *message;
+            message++;
         }
-        helper->messageBuffer[helper->lastIndex++] = *message++;
     }
+    if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+        helper->messageBuffer[helper->lastIndex++] = 0;
+    }
+    atomic_flag_clear(&helper->flag);
 }
 
-#define MGI_DEBUG_LOG(message) __internal_print(info->__pDebugHelper, message)
+#define MGI_DEBUG_LOG(message) __internal_print(&info->__pDebugHelper, (MGI_CONST char*)(message))
 
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);

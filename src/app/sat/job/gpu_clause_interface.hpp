@@ -39,29 +39,32 @@ private:
         using namespace mgi;
 
         // TODO Prefix calculations multi threaded!!!
-        // THIS IS BULLSHIT!
         std::vector<uint32_t> prefixes;
         prefixes.push_back(0);
         uint32_t maxSize = 0;
+        // TODO Do not extra copy! Sort somewhere else
+        std::vector<int> copy(values.begin(), values.end());
         for (auto i = std::find(values.begin(), values.end(), 0); 
                   i != values.end(); i = std::find(i + 1, values.end(), 0))
         {
             const auto last = prefixes.back();
             const auto current = std::distance(values.begin(), i);
-            prefixes.push_back(current);
+            prefixes.push_back(current + 1);
             maxSize = std::max(maxSize, (uint32_t)(current - last));
-
+            std::sort(copy.begin() + last, copy.begin() + current, [] (auto valueL, auto valueR) { return abs(valueL) < abs(valueR); });
         }
         maxSize *= maxSize; // Could be quadratic
 
         const auto clauseAmount = prefixes.size();
         // Past the end
-        prefixes.push_back(std::distance(values.begin(), values.end()));
+        const auto last = prefixes.back();
+        std::sort(copy.begin() + last, copy.end(), [] (auto valueL, auto valueR) { return abs(valueL) < abs(valueR); });
+        prefixes.push_back(std::distance(values.begin(), values.end()) + 1);
 
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
-        std::array allocations = { AllocationInfo::from(MemoryType::Constant, values),
+        std::array allocations = { AllocationInfo::from<int>(MemoryType::Constant, copy), // TODO remove copy
                                    AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
                                  };
         auto memories = _mgi_api.allocate(allocations);
@@ -95,7 +98,7 @@ public:
             _post_buffer(params, false, 256, true, 1<<20) {
         using namespace mgi;
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
-        mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Constant, sizeof(MGIInfo)))).back();
+        mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Global, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
         if(useBackgroundThreads)
             launchBackgroundThreads();

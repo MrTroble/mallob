@@ -30,12 +30,18 @@ public:
         if (!interface.tasksToRetire.empty())
             interface._mgi_api.waitTasks(interface.tasksToRetire);
     }
-    
+
     std::vector<MGIReservoir> testAfterPush(size_t count)
     {
+        {
+            
+            const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
+            MGIInfo* res = ((MGIInfo *)readLock.ptr[0]);
+            LOG(V5_DEBG, "Shader: %s\n", res->__pDebugHelper.messageBuffer);
+        }
         std::vector<MGIReservoir> copyRes(count);
         const auto readLock = interface._mgi_api.readMemory(interface.currentReservoir, from(ReadInfo{sizeof(MGIReservoir) * count}));
-        std::copy((MGIReservoir*)readLock.ptr[0], (MGIReservoir*)readLock.ptr[0] + count, copyRes.begin());
+        std::copy((MGIReservoir *)readLock.ptr[0], (MGIReservoir *)readLock.ptr[0] + count, copyRes.begin());
         return copyRes;
     }
 };
@@ -144,7 +150,8 @@ void testRoutine()
     const auto reservoirsLast = gpuInterface.testAfterPush(2);
     assert(reservoirsLast[0].resolve.clauseOne == 0);
     assert(reservoirsLast[0].resolve.clauseTwo == 1);
-    assert(reservoirsLast[0].resolve.literal != 0);
+    assert(reservoirsLast[0].resolve.literal == 1);
+    assert(reservoirsLast[0].resolve.resolvedSize == 0);
 
     LOG(V2_INFO, "Finished Clause Interface test\n");
 }
@@ -184,7 +191,7 @@ namespace test
             clauses[i + elementsPerClaus + 1] = -(int)i - 1;
         }
 
-        std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2 * elementsPerClaus + 1};
+        std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2 * elementsPerClaus + 2};
         std::vector<MGIResolveInfo> resolves(2);
         findResolvents(clauses.data(), beginings.data(), resolves.data());
         MGIResolveInfo localResolve = resolves[0];
@@ -199,7 +206,7 @@ namespace test
 
         MGIInfo mgiInfo;
         mgiInfo.maxClauseSize = 20000;
-        
+
         /*
          * Self note it  is ySize = floor(n/2)
          */
@@ -207,9 +214,10 @@ namespace test
         {
             MGIReservoir reservoir;
             findResolventsReservoir(&mgiInfo, clauses.data(), beginings.data(), &reservoir);
-            assert(reservoir.resolve.literal != 0);
+            assert(reservoir.resolve.literal == 1);
             assert(reservoir.resolve.clauseOne == 0);
             assert(reservoir.resolve.clauseTwo == 1);
+            assert(reservoir.resolve.resolvedSize == 0);
         }
 
         {
