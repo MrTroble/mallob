@@ -116,7 +116,10 @@ MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST 
         }
     }
     if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
-        helper->messageBuffer[helper->lastIndex++] = 0;
+        helper->messageBuffer[helper->lastIndex++] = '\n';
+    }
+    if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+        helper->messageBuffer[helper->lastIndex] = 0;
     }
     atomic_flag_clear(&helper->flag);
 }

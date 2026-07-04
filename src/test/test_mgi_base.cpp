@@ -37,7 +37,7 @@ public:
             
             const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
             MGIInfo* res = ((MGIInfo *)readLock.ptr[0]);
-            LOG(V5_DEBG, "Shader: %s\n", res->__pDebugHelper.messageBuffer);
+            LOG(V5_DEBG, "Shader: %s", res->__pDebugHelper.messageBuffer);
         }
         std::vector<MGIReservoir> copyRes(count);
         const auto readLock = interface._mgi_api.readMemory(interface.currentReservoir, from(ReadInfo{sizeof(MGIReservoir) * count}));
