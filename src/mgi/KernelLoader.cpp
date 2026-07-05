@@ -26,7 +26,12 @@ namespace mgi
 
         std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram, kernelShared};
         std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp", "MGIShared.hpp"};
-        std::string compilerOptions = "-cl-std=CL2.0 -D MGI_API_OCL -I ./";
+        std::string additionalOptions;
+        #ifdef DEBUG
+            // TODO CHECK available
+            additionalOptions += "-cl-nv-verbose -cl-nv-opt-level=0";
+        #endif
+        std::string compilerOptions = additionalOptions + " -cl-std=CL2.0 -D MGI_API_OCL -I ./";
 
         try
         {

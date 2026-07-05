@@ -85,6 +85,8 @@ private:
         taskInfo.kernel = this->resolutionKernel;
         taskInfo.function = "findResolventsReservoir";
         taskInfo.descriptor.memory = memories;
+        taskInfo.groupSizes[0] = std::min(clauseAmount, (size_t)4);
+        taskInfo.groupSizes[1] = std::min(sizeOfY, (size_t)4);
         if(lastTask) {
             taskInfo.waitForTasks.push_back(lastTask);
             tasksToRetire.push_back(lastTask);

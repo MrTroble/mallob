@@ -55,17 +55,16 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
     // TODO Check Register pressure
     // TODO Use shared cache for clause lookups
 
-    MGI_LOCAL MGIReservoir currentReservoir = toResolve[MGI_GID_X];
+    MGIReservoir currentReservoir = toResolve[MGI_GID_X];
     currentReservoir.weight = 0;
     currentReservoir.resolve.literal = 0;
     MGI_CONST int *currentBegin = clauses + position;
     MGI_CONST int *currentEnd = currentBegin + sizeOfClause;
-    MGI_LOCAL MGIResolveInfo resolve;
-    resolve.clauseOne = MGI_GID_X;
-
-    //MGI_DEBUG_LOG("Test!");
 
     {
+        MGIResolveInfo resolve;
+        resolve.clauseOne = MGI_GID_X;
+
         MGI_LOCAL MGIRng rng;
         mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
         const float maxValue = info->maxClauseSize;
@@ -124,6 +123,19 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
         }
     }
     toResolve[MGI_GID_X] = currentReservoir;
+    // ?????????????????????????????????????????
+    // With out this code ... nothing works
+    // ?????????????? Like idk test on other device!!
+    MGI_CONST char* message = "test";
+    while (*message != 0 && info->__pDebugHelper.lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
+    {
+        if(info->__pDebugHelper.lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+            //info->__pDebugHelper.overflowMessageCount++;
+        } else {
+            //info->__pDebugHelper.messageBuffer[info->__pDebugHelper.lastIndex++] = *message;
+            message++;
+        }
+    }
 }
 
 // https://dl.acm.org/doi/10.1145/7902.7903
