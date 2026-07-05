@@ -264,8 +264,8 @@ namespace mgi
 
     struct TaskInfo
     {
-        Extension extensions;
-        TaskType type;
+        Extension extensions{};
+        TaskType type = TaskType::Burst;
         size_t range[3];
         Kernel kernel;
         std::string function;

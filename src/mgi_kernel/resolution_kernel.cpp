@@ -136,9 +136,9 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *res
         clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
     }
     
-    MGI_BARRIER();
+    MGI_BARRIER(MGI_MEM_GLOBAL);
 
-    m_uint maxSteps = ceil(log2(MGI_GSIZE_X));
+    m_uint maxSteps = ceil(log2((float)MGI_GSIZE_X));
     // TODO Shared caches!!!
     for (size_t i = 0; i < maxSteps; i++)
     {
@@ -146,9 +146,11 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *res
         if(otherIndex < MGI_GSIZE_X) {
             clauseOuts[otherIndex] += clauseOuts[current];
         }
-        MGI_BARRIER();
+        MGI_BARRIER(MGI_MEM_GLOBAL);
     }
 }
+
+MGI_KERNEL void debugReset(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
 
 // Merge for resolve
 MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses, 

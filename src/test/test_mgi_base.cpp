@@ -31,14 +31,19 @@ public:
             interface._mgi_api.waitTasks(interface.tasksToRetire);
     }
 
+    void getDebugOutput() {
+        const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
+        MGIInfo* res = ((MGIInfo *)readLock.ptr[0]);
+        LOG(V5_DEBG, "Shader: %s", res->__pDebugHelper.messageBuffer);
+        TaskInfo taskInfo{{}, TaskType::Burst, {1, 1, 1}};
+        taskInfo.kernel = interface.resolutionKernel;
+        taskInfo.function = "debugReset";
+        taskInfo.descriptor.memory.push_back(interface.mgiInfo);
+        interface._mgi_api.queueWaitTasks(from(taskInfo));
+    }
+
     std::vector<MGIReservoir> testAfterPush(size_t count)
     {
-        {
-            
-            const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
-            MGIInfo* res = ((MGIInfo *)readLock.ptr[0]);
-            LOG(V5_DEBG, "Shader: %s", res->__pDebugHelper.messageBuffer);
-        }
         std::vector<MGIReservoir> copyRes(count);
         const auto readLock = interface._mgi_api.readMemory(interface.currentReservoir, from(ReadInfo{sizeof(MGIReservoir) * count}));
         std::copy((MGIReservoir *)readLock.ptr[0], (MGIReservoir *)readLock.ptr[0] + count, copyRes.begin());
@@ -147,6 +152,8 @@ void testRoutine()
 
     LOG(V2_INFO, "Finished GPU Tasks\n");
 
+    //gpuInterface.getDebugOutput();
+    
     const auto reservoirsLast = gpuInterface.testAfterPush(2);
     assert(reservoirsLast[0].resolve.clauseOne == 0);
     assert(reservoirsLast[0].resolve.clauseTwo == 1);

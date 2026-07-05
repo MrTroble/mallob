@@ -34,6 +34,10 @@ extern "C" {
     #define MGI_LOCAL private 
 
     #define MGI_BARRIER(flags) barrier(flags)
+    #define MGI_MEM_GLOBAL CLK_GLOBAL_MEM_FENCE
+    #define MGI_MEM_LOCAL CLK_LOCAL_MEM_FENCE
+    #define MGI_MEM_IMAGE CLK_IMAGE_MEM_FENCE
+
     #else
     #define MGI_GLOBAL  
     #define MGI_SHARED  
@@ -41,6 +45,9 @@ extern "C" {
     #define MGI_LOCAL  
         
     #define MGI_BARRIER(flags)
+    #define MGI_MEM_GLOBAL 1
+    #define MGI_MEM_LOCAL 2
+    #define MGI_MEM_IMAGE 4
     #endif
     
 typedef uint2 m_uint2;
