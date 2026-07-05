@@ -46,7 +46,7 @@ MGI_KERNEL void findResolvents(MGI_CONST int *clauses, MGI_CONST m_uint *clauses
 }
 
 // TODO Prefetching
-MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo* info, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
+MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
 {
     const m_uint x = MGI_GID_X;
     const m_uint position = clausesStarts[x];
@@ -69,7 +69,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo* info, MGI_CONST int 
     resolve.clauseOne = x;
     const m_uint divider = MGI_GSIZE_X;
     const float maxValue = info->maxClauseSize;
-    MGI_DEBUG_LOG("Test!");
     for (m_uint i = 0; i < amountOfOtherClauses; i++)
     {
         const m_uint index = (x + i + 1) % divider;
@@ -77,19 +76,18 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo* info, MGI_CONST int 
         MGI_CONST int *otherEnd = clauses + clausesStarts[index + 1] - 1;
         MGI_CONST int *iter = currentBegin;
         m_uint sizeOfOther = otherEnd - otherBegin;
-        //int difference = sizeOfClause - sizeOfOther;
         m_uint heuristic = 0;
         resolve.literal = 0;
         resolve.clauseTwo = index;
         resolve.resolvedSize = 0;
-        for (;!(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
+        for (; !(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
         {
             int l1 = *iter;
             int l2 = *otherBegin;
             // TODO Make this mathematical
             if (l1 == -l2)
             {
-                resolve.literal += (resolve.literal == 0 ? abs(l1):0);
+                resolve.literal += (resolve.literal == 0 ? abs(l1) : 0);
                 iter++;
                 otherBegin++;
             }
@@ -114,14 +112,16 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo* info, MGI_CONST int 
                 heuristic++;
             }
         }
-        if(otherBegin != otherEnd) {
+        if (otherBegin != otherEnd)
+        {
             heuristic += otherEnd - otherBegin;
         }
-        if(iter != currentEnd) {
+        if (iter != currentEnd)
+        {
             heuristic += currentEnd - iter;
         }
         resolve.resolvedSize = heuristic;
-        float weight = (resolve.literal == 0 ? 0:1) * (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
+        float weight = (resolve.literal == 0 ? 0 : 1) * (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
         mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
     }
 
@@ -130,22 +130,66 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo* info, MGI_CONST int 
 
 // Merge for resolve
 
-MGI_KERNEL void resolve(MGI_CONST MGIResolveInfo *resolve, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL int *newClause)
+MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses, 
+                        MGI_CONST m_uint *clausesStarts, MGI_CONST m_uint *clauseOuts, MGI_GLOBAL int *newClause)
 {
-    MGI_GLOBAL int *iter = newClause;
-    MGIResolveInfo localResolve = *resolve;
+    MGI_GLOBAL int *iterOut = newClause + clauseOuts[MGI_GID_X];
+    MGI_LOCAL MGIResolveInfo localResolve = resolve->resolve;
+    if(localResolve.resolvedSize == 0) return;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];
-    m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart;
+    m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart - 1;
     m_uint secondStart = clausesStarts[localResolve.clauseTwo];
-    m_uint sizeSecond = clausesStarts[localResolve.clauseTwo + 1] - secondStart;
+    m_uint sizeSecond = clausesStarts[localResolve.clauseTwo + 1] - secondStart - 1;
 
-    MGI_CONST int *clausStartFirst = clauses + firstStart;
-    for (m_uint x = 0; x < sizeFirst; x++)
+    MGI_CONST int *iter = clauses + firstStart;
+    MGI_CONST int *currentEnd = iter + sizeFirst;
+    MGI_CONST int *otherBegin = clauses + secondStart;
+    MGI_CONST int *otherEnd = otherBegin + sizeSecond;
+    
+    for (; !(iter == otherEnd || iter == currentEnd);) // This actually resolves
     {
-        m_uint current = clausStartFirst[x];
-        if (current == localResolve.literal) {
-            *iter = current;
+        int l1 = *iter;
+        int l2 = *otherBegin;
+        // TODO Make this mathematical
+        if (l1 == -l2)
+        {
             iter++;
+            otherBegin++;
         }
+        else if (l1 == l2)
+        {
+            iter++;
+            otherBegin++;
+            *iterOut = l1;
+            iterOut++;
+        }
+        else
+        {
+            l1 = abs(l1);
+            l2 = abs(l2);
+            if (l1 < l2)
+            {
+                iter++;
+                *iterOut = l1;
+            }
+            else
+            {
+                otherBegin++;
+                *iterOut = l2;
+            }
+            iterOut++;
+        }
+    }
+    while (otherBegin != otherEnd)
+    {
+        *iterOut = *otherBegin;
+        otherBegin++;
+        iterOut++;
+    }
+    while (iter != currentEnd)
+    {
+        *iterOut = *iter;
+        iter++;
+        iterOut++;
     }
 }
