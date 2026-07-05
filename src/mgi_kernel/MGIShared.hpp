@@ -148,7 +148,7 @@ MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* res
     }
 }
 
-MGI_K_INLINE void mgiReserviorAddSample(MGI_LOCAL MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+MGI_K_INLINE void mgiReserviorAddSample(MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     reservior->weight += weight;
     if((weight / reservior->weight) >= mgiRNGRndFloat(rng)) {
         reservior->resolve = *resolve;

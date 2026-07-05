@@ -23,8 +23,13 @@ public:
 
     void testWaitForTasks()
     {
-        const auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
+        auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
         LOG(V2_INFO, "Status: %d!\n", status);
+        while(status != TaskStatus::Complete) {
+            status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
+            LOG(V2_INFO, "Status: %d!\n", status);
+            sleep(1);
+        }
         if (interface.lastTask)
             interface._mgi_api.waitTasks(from(interface.lastTask));
         if (!interface.tasksToRetire.empty())
@@ -152,7 +157,7 @@ void testRoutine()
 
     LOG(V2_INFO, "Finished GPU Tasks\n");
 
-    //gpuInterface.getDebugOutput();
+    gpuInterface.getDebugOutput();
     
     const auto reservoirsLast = gpuInterface.testAfterPush(2);
     assert(reservoirsLast[0].resolve.clauseOne == 0);
@@ -282,9 +287,9 @@ namespace test
 int main(int argc, char *argv[])
 {
 
-    MyMpi::init();
+    //MyMpi::init();
     Timer::init();
-    int rank = MyMpi::rank(MPI_COMM_WORLD);
+    int rank = 0; //MyMpi::rank(MPI_COMM_WORLD);
 
     Process::init(rank);
 
@@ -293,7 +298,7 @@ int main(int argc, char *argv[])
 
     Parameters params;
     params.init(argc, argv);
-    MyMpi::setOptions(params);
+    //MyMpi::setOptions(params);
 
     test::testResolutionKernel();
     testRoutine();

@@ -683,7 +683,7 @@ namespace mgi
                               (cl_event *)task.waitForTasks.data() + task.waitForTasks.size(), dependencyNext.begin() + last);
                 }
                 // Must be nullptr ... to bad that the api is shit!
-                cl_event *dependencyChain = dependencyNext.empty() ? dependencyNext.data() : nullptr;
+                cl_event *dependencyChain = dependencyNext.empty() ? nullptr : dependencyNext.data();
                 MGI_DB_CHECK(clEnqueueNDRangeKernel(queue, kernel, 3, nullptr, task.range, task.groupSizes, dependencyNext.size(),
                                                     dependencyChain, (cl_event *)(returnTasks.data() + index)),
                              "Could not enqueue kernel %s", task.function.c_str());
@@ -711,7 +711,7 @@ namespace mgi
         {
             cl_int value = 0;
             std::vector<TaskStatus> status(tasks.size());
-            size_t index = 0;
+            cl_int index = 0;
             for (const auto t : tasks)
             {
                 const auto error = clGetEventInfo((cl_event)t.internal, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(value), &value, nullptr);

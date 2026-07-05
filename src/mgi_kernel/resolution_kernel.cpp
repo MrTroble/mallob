@@ -48,94 +48,93 @@ MGI_KERNEL void findResolvents(MGI_CONST int *clauses, MGI_CONST m_uint *clauses
 // TODO Prefetching
 MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
 {
-    const m_uint x = MGI_GID_X;
-    const m_uint position = clausesStarts[x];
-    const m_uint sizeOfClause = clausesStarts[x + 1] - position - 1;
-
-    MGI_LOCAL MGIRng rng;
-    mgiRNGInit(&rng, x, 0, 1, 117007);
+    const m_uint position = clausesStarts[MGI_GID_X];
+    const m_uint sizeOfClause = clausesStarts[MGI_GID_X + 1] - position - 1;
 
     // TODO Use LOCAL reservoir and ONLY MERGE AT THE END! Shuffle reservoirs
     // TODO Check Register pressure
     // TODO Use shared cache for clause lookups
-    MGI_LOCAL MGIReservoir currentReservoir = toResolve[x];
+
+    MGI_LOCAL MGIReservoir currentReservoir = toResolve[MGI_GID_X];
     currentReservoir.weight = 0;
     currentReservoir.resolve.literal = 0;
-    int literal = 0;
-    const m_uint amountOfOtherClauses = MGI_GSIZE_Y;
     MGI_CONST int *currentBegin = clauses + position;
     MGI_CONST int *currentEnd = currentBegin + sizeOfClause;
     MGI_LOCAL MGIResolveInfo resolve;
-    resolve.clauseOne = x;
-    const m_uint divider = MGI_GSIZE_X;
-    const float maxValue = info->maxClauseSize;
-    for (m_uint i = 0; i < amountOfOtherClauses; i++)
+    resolve.clauseOne = MGI_GID_X;
+
+    //MGI_DEBUG_LOG("Test!");
+
     {
-        const m_uint index = (x + i + 1) % divider;
-        MGI_CONST int *otherBegin = clauses + clausesStarts[index];
-        MGI_CONST int *otherEnd = clauses + clausesStarts[index + 1] - 1;
-        MGI_CONST int *iter = currentBegin;
-        m_uint sizeOfOther = otherEnd - otherBegin;
-        m_uint heuristic = 0;
-        resolve.literal = 0;
-        resolve.clauseTwo = index;
-        resolve.resolvedSize = 0;
-        for (; !(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
+        MGI_LOCAL MGIRng rng;
+        mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
+        const float maxValue = info->maxClauseSize;
+
+        for (m_uint i = 0; i < MGI_GSIZE_Y; i++)
         {
-            int l1 = *iter;
-            int l2 = *otherBegin;
-            // TODO Make this mathematical
-            if (l1 == -l2)
+            const m_uint index = (MGI_GID_X + i + 1) % MGI_GSIZE_X;
+            MGI_CONST int *otherBegin = clauses + clausesStarts[index];
+            MGI_CONST int *otherEnd = clauses + clausesStarts[index + 1] - 1;
+            MGI_CONST int *iter = currentBegin;
+            resolve.literal = 0;
+            resolve.clauseTwo = index;
+            resolve.resolvedSize = 0;
+            for (; !(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
             {
-                resolve.literal += (resolve.literal == 0 ? abs(l1) : 0);
-                iter++;
-                otherBegin++;
-            }
-            else if (l1 == l2)
-            {
-                iter++;
-                otherBegin++;
-                heuristic++;
-            }
-            else
-            {
-                l1 = abs(l1);
-                l2 = abs(l2);
-                if (l1 < l2)
+                int l1 = *iter;
+                int l2 = *otherBegin;
+                // TODO Make this mathematical
+                if (l1 == -l2)
+                {
+                    resolve.literal += (resolve.literal == 0 ? abs(l1) : 0);
+                    iter++;
+                    otherBegin++;
+                }
+                else if (l1 == l2)
                 {
                     iter++;
+                    otherBegin++;
+                    resolve.resolvedSize++;
                 }
                 else
                 {
-                    otherBegin++;
+                    l1 = abs(l1);
+                    l2 = abs(l2);
+                    if (l1 < l2)
+                    {
+                        iter++;
+                    }
+                    else
+                    {
+                        otherBegin++;
+                    }
+                    resolve.resolvedSize++;
                 }
-                heuristic++;
             }
+            if (otherBegin != otherEnd)
+            {
+                resolve.resolvedSize += otherEnd - otherBegin;
+            }
+            if (iter != currentEnd)
+            {
+                resolve.resolvedSize += currentEnd - iter;
+            }
+            float weight = (resolve.literal == 0 ? 0 : 1) * (1.0f / ((float)MGI_GSIZE_Y)) * (1 - (resolve.resolvedSize / maxValue));
+            mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
         }
-        if (otherBegin != otherEnd)
-        {
-            heuristic += otherEnd - otherBegin;
-        }
-        if (iter != currentEnd)
-        {
-            heuristic += currentEnd - iter;
-        }
-        resolve.resolvedSize = heuristic;
-        float weight = (resolve.literal == 0 ? 0 : 1) * (1.0f / ((float)amountOfOtherClauses)) * (1 - (resolve.resolvedSize / maxValue));
-        mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
     }
-
-    toResolve[x] = currentReservoir;
+    toResolve[MGI_GID_X] = currentReservoir;
 }
 
 // https://dl.acm.org/doi/10.1145/7902.7903
-MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts) {
+MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
+{
     const m_uint current = MGI_GID_X + 1;
     clauseOuts[0] = 0; // TODO Recheck
     {
         clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
     }
-    
+
     MGI_BARRIER(MGI_MEM_GLOBAL);
 
     m_uint maxSteps = ceil(log2((float)MGI_GSIZE_X));
@@ -143,7 +142,8 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *res
     for (size_t i = 0; i < maxSteps; i++)
     {
         const m_uint otherIndex = current + (1 << i);
-        if(otherIndex < MGI_GSIZE_X) {
+        if (otherIndex < MGI_GSIZE_X)
+        {
             clauseOuts[otherIndex] += clauseOuts[current];
         }
         MGI_BARRIER(MGI_MEM_GLOBAL);
@@ -153,12 +153,13 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *res
 MGI_KERNEL void debugReset(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
 
 // Merge for resolve
-MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses, 
+MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses,
                         MGI_CONST m_uint *clausesStarts, MGI_CONST m_uint *clauseOuts, MGI_GLOBAL int *newClause)
 {
     MGI_GLOBAL int *iterOut = newClause + clauseOuts[MGI_GID_X];
     MGI_LOCAL MGIResolveInfo localResolve = resolve->resolve;
-    if(localResolve.resolvedSize == 0) return;
+    if (localResolve.resolvedSize == 0)
+        return;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];
     m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart - 1;
     m_uint secondStart = clausesStarts[localResolve.clauseTwo];
@@ -168,7 +169,7 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolv
     MGI_CONST int *currentEnd = iter + sizeFirst;
     MGI_CONST int *otherBegin = clauses + secondStart;
     MGI_CONST int *otherEnd = otherBegin + sizeSecond;
-    
+
     for (; !(iter == otherEnd || iter == currentEnd);) // This actually resolves
     {
         int l1 = *iter;
