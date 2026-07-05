@@ -128,8 +128,29 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
     toResolve[x] = currentReservoir;
 }
 
-// Merge for resolve
+// https://dl.acm.org/doi/10.1145/7902.7903
+MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts) {
+    const m_uint current = MGI_GID_X + 1;
+    clauseOuts[0] = 0; // TODO Recheck
+    {
+        clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
+    }
+    
+    MGI_BARRIER();
 
+    m_uint maxSteps = ceil(log2(MGI_GSIZE_X));
+    // TODO Shared caches!!!
+    for (size_t i = 0; i < maxSteps; i++)
+    {
+        const m_uint otherIndex = current + (1 << i);
+        if(otherIndex < MGI_GSIZE_X) {
+            clauseOuts[otherIndex] += clauseOuts[current];
+        }
+        MGI_BARRIER();
+    }
+}
+
+// Merge for resolve
 MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses, 
                         MGI_CONST m_uint *clausesStarts, MGI_CONST m_uint *clauseOuts, MGI_GLOBAL int *newClause)
 {
@@ -192,4 +213,5 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolv
         iter++;
         iterOut++;
     }
+    *iterOut = 0;
 }

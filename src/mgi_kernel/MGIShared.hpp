@@ -32,11 +32,15 @@ extern "C" {
     #define MGI_SHARED local 
     #define MGI_CONST const constant
     #define MGI_LOCAL private 
+
+    #define MGI_BARRIER(flags) barrier(flags)
     #else
     #define MGI_GLOBAL  
     #define MGI_SHARED  
     #define MGI_CONST 
     #define MGI_LOCAL  
+        
+    #define MGI_BARRIER(flags)
     #endif
     
 typedef uint2 m_uint2;
