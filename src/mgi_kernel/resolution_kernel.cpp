@@ -156,7 +156,7 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolv
                         MGI_CONST m_uint *clausesStarts, MGI_CONST m_uint *clauseOuts, MGI_GLOBAL int *newClause)
 {
     MGI_GLOBAL int *iterOut = newClause + clauseOuts[MGI_GID_X];
-    MGI_LOCAL MGIResolveInfo localResolve = resolve->resolve;
+    MGI_LOCAL MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
     if (localResolve.resolvedSize == 0)
         return;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];
@@ -169,7 +169,7 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolv
     MGI_CONST int *otherBegin = clauses + secondStart;
     MGI_CONST int *otherEnd = otherBegin + sizeSecond;
 
-    while(!(iter == otherEnd || iter == currentEnd)) // This actually resolves
+    while(!(otherBegin == otherEnd || iter == currentEnd)) // This actually resolves
     {
         int l1 = *iter;
         int l2 = *otherBegin;

@@ -260,6 +260,14 @@ namespace test
 
             assert(reservoir[0].resolve.literal == 0);
             assert(reservoir[1].resolve.literal == 0);
+
+            std::vector<m_uint> outs{0, 0, 0};
+            std::vector<int> values{};
+            values.resize(3);
+            resolve(&mgiInfo, reservoir.data(), literals.data(), ends.data(), outs.data(), values.data());
+            assert(values[0] == 1);
+            assert(values[1] == 3);
+            assert(values[2] == 6);
         }
         {
             auto [literals, ends] = generate({{1, -2, 3}, {1, 2, 6}}); // 1 and 3 are resolvable
