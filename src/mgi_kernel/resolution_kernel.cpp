@@ -78,7 +78,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
             resolve.literal = 0;
             resolve.clauseTwo = index;
             resolve.resolvedSize = 0;
-            for (; !(otherBegin == otherEnd || iter == currentEnd);) // This calculates the heursitic and does merging
+            while (!(otherBegin == otherEnd || iter == currentEnd)) // This calculates the heursitic and does merging
             {
                 int l1 = *iter;
                 int l2 = *otherBegin;
@@ -123,19 +123,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
         }
     }
     toResolve[MGI_GID_X] = currentReservoir;
-    // ?????????????????????????????????????????
-    // With out this code ... nothing works
-    // ?????????????? Like idk test on other device!!
-    MGI_CONST char* message = "test";
-    while (*message != 0 && info->__pDebugHelper.lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
-    {
-        if(info->__pDebugHelper.lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
-            //info->__pDebugHelper.overflowMessageCount++;
-        } else {
-            //info->__pDebugHelper.messageBuffer[info->__pDebugHelper.lastIndex++] = *message;
-            message++;
-        }
-    }
 }
 
 // https://dl.acm.org/doi/10.1145/7902.7903
@@ -182,7 +169,7 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolv
     MGI_CONST int *otherBegin = clauses + secondStart;
     MGI_CONST int *otherEnd = otherBegin + sizeSecond;
 
-    for (; !(iter == otherEnd || iter == currentEnd);) // This actually resolves
+    while(!(iter == otherEnd || iter == currentEnd)) // This actually resolves
     {
         int l1 = *iter;
         int l2 = *otherBegin;
