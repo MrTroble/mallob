@@ -6,7 +6,7 @@ const m_uint MAX_SIZE_CACHED = 256;
 // TODO Redo with sorting
 bool checkIsInverseIn(int clause, MGI_IN int *literalsBegin, MGI_IN int *literalsEnd)
 {
-    for (MGI_CONST int *iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
+    for (MGI_IN int *iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
         if ((*iter + clause) == 0)
             return true; // SIMD?
     return false;
@@ -24,15 +24,15 @@ MGI_KERNEL void findResolvents(MGI_IN int *clauses, MGI_IN m_uint *clausesStarts
     const m_uint sizeX = MGI_GSIZE_X;
     const m_uint y = ((MGI_GID_Y) + x + 1) % (sizeX + 1); // Only compares with a halfe turnaround (n - 1)n/2
                                                           // because otherwise we would double check
-    MGI_CONST int *otherBegin = clauses + clausesStarts[y];
-    MGI_CONST int *otherEnd = clauses + clausesStarts[y + 1];
+    MGI_IN int *otherBegin = clauses + clausesStarts[y];
+    MGI_IN int *otherEnd = clauses + clausesStarts[y + 1];
 
     MGI_GLOBAL MGIResolveInfo *localResolve = toResolve + x + (y - x - 1) * sizeX;
     localResolve->literal = 0;
 
     // TODO Cached version
-    MGI_CONST int *endIter = clauses + clausesStarts[x + 1];
-    for (MGI_CONST int *iter = clauses + position; iter != endIter; iter++)
+    MGI_IN int *endIter = clauses + clausesStarts[x + 1];
+    for (MGI_IN int *iter = clauses + position; iter != endIter; iter++)
     {
         if (checkIsInverseIn(*iter, otherBegin, otherEnd))
         {
@@ -60,15 +60,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
     currentReservoir.resolve.literal = 0;
     const m_uint currentBegin = position;
     const m_uint currentEnd = currentBegin + sizeOfClause;
-
-    char testString[32];
-    toString(testString, clausesStarts[0]);
-    testString[8] = ',';
-    toString(testString + 9, clausesStarts[1]);
-    testString[17] = ',';
-    toString(testString + 18, MGI_GID_X);
-    MGI_DEBUG_LOGG(testString);
-
     {
         MGI_LOCAL MGIResolveInfo resolve;
         resolve.clauseOne = MGI_GID_X;
@@ -105,9 +96,6 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
                 const uint oneSmalerTwo = l1A < l2A ? 1:0;
                 iter += oneSmalerTwo + equal;
                 otherBegin += (1 - oneSmalerTwo);
-                toString(testString, loop);
-                MGI_DEBUG_LOGG(testString);
-                //MGI_DEBUG_LOG("T!");
             }
             if (otherBegin != otherEnd)
             {
@@ -163,10 +151,10 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 
     m_uint secondStart = clausesStarts[localResolve.clauseTwo];
     m_uint sizeSecond = clausesStarts[localResolve.clauseTwo + 1] - secondStart - 1;
 
-    MGI_CONST int *iter = clauses + firstStart;
-    MGI_CONST int *currentEnd = iter + sizeFirst;
-    MGI_CONST int *otherBegin = clauses + secondStart;
-    MGI_CONST int *otherEnd = otherBegin + sizeSecond;
+    MGI_IN int *iter = clauses + firstStart;
+    MGI_IN int *currentEnd = iter + sizeFirst;
+    MGI_IN int *otherBegin = clauses + secondStart;
+    MGI_IN int *otherEnd = otherBegin + sizeSecond;
 
     while(!(otherBegin == otherEnd || iter == currentEnd)) // This actually resolves
     {
