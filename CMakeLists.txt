@@ -271,15 +271,18 @@ if(${MALLOB_MGI_TEST_COMPILE})
 foreach(file ${kernelfiles})
   cmake_path(GET file FILENAME filename)
   add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" COMMAND clang "-cl-std=cl3.0" "-I" "${CMAKE_BINARY_DIR}/mgi_kernel" "--target=spirv64" "-DMGI_API_OCL=1" "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
+  add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}" 
+                     COMMAND ${CMAKE_COMMAND} -E copy
+                       "${file}"
+                       "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}"
+                     COMMENT "Copying shader: ${file} to output dir"
+                     MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
   list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
+  list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}")
 endforeach()
 message("Enabled test compile!")
 add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
 endif()
-
-foreach(file ${kernelfiles})
-file(COPY "${file}" DESTINATION "${CMAKE_BINARY_DIR}/mgi_kernel")
-endforeach()
 
 endif()
 
