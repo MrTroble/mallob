@@ -4,7 +4,7 @@
 const m_uint MAX_SIZE_CACHED = 256;
 
 // TODO Redo with sorting
-bool checkIsInverseIn(int clause, MGI_CONST int *literalsBegin, MGI_CONST int *literalsEnd)
+bool checkIsInverseIn(int clause, MGI_IN int *literalsBegin, MGI_IN int *literalsEnd)
 {
     for (MGI_CONST int *iter = literalsBegin; iter != literalsEnd; iter++) // TODO Check unrolling
         if ((*iter + clause) == 0)
@@ -15,7 +15,7 @@ bool checkIsInverseIn(int clause, MGI_CONST int *literalsBegin, MGI_CONST int *l
 // TODO Reservoir based picking that only use different
 // use MGI_LOCAL MGIReservoir in order to only have atomics from each work group
 
-MGI_KERNEL void findResolvents(MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIResolveInfo *toResolve)
+MGI_KERNEL void findResolvents(MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, MGI_GLOBAL MGIResolveInfo *toResolve)
 {
     const m_uint x = MGI_GID_X;
     const m_uint position = clausesStarts[x];
@@ -46,7 +46,7 @@ MGI_KERNEL void findResolvents(MGI_CONST int *clauses, MGI_CONST m_uint *clauses
 }
 
 // TODO Prefetching
-MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int *clauses, MGI_CONST m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
+MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
 {
     const m_uint position = clausesStarts[MGI_GID_X];
     const m_uint sizeOfClause = clausesStarts[MGI_GID_X + 1] - position - 1;
@@ -61,6 +61,14 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
     const m_uint currentBegin = position;
     const m_uint currentEnd = currentBegin + sizeOfClause;
 
+    char testString[32];
+    toString(testString, clausesStarts[0]);
+    testString[8] = ',';
+    toString(testString + 9, clausesStarts[1]);
+    testString[17] = ',';
+    toString(testString + 18, MGI_GID_X);
+    MGI_DEBUG_LOGG(testString);
+
     {
         MGI_LOCAL MGIResolveInfo resolve;
         resolve.clauseOne = MGI_GID_X;
@@ -69,7 +77,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
         mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
         const float maxValue = (float)info->maxClauseSize;
 
-        __attribute__((opencl_unroll_hint(1)))
+        MGI_UNROLL_HINT(1)
         for (m_uint i = 0; i < MGI_GSIZE_Y; i++)
         {
             const m_uint index = (MGI_GID_X + i + 1) % MGI_GSIZE_X;
@@ -79,9 +87,11 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
             resolve.literal = 0;
             resolve.clauseTwo = index;
             resolve.resolvedSize = 0;
+
+            const m_uint maxLoop = sizeOfClause + (otherEnd - otherBegin);
             
-            __attribute__((opencl_unroll_hint(1)))
-            while (otherBegin < otherEnd && iter < currentEnd)
+            MGI_UNROLL_HINT(1)
+            for (m_uint loop = 0; otherBegin < otherEnd && iter < currentEnd && loop < maxLoop; loop++)
             {
                 const int l1 = clauses[iter];
                 const int l2 = clauses[otherBegin];
@@ -95,6 +105,9 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
                 const uint oneSmalerTwo = l1A < l2A ? 1:0;
                 iter += oneSmalerTwo + equal;
                 otherBegin += (1 - oneSmalerTwo);
+                toString(testString, loop);
+                MGI_DEBUG_LOGG(testString);
+                //MGI_DEBUG_LOG("T!");
             }
             if (otherBegin != otherEnd)
             {
@@ -112,7 +125,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
 }
 
 // https://dl.acm.org/doi/10.1145/7902.7903
-MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
+MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
 {
     const m_uint current = MGI_GID_X + 1;
     clauseOuts[0] = 0; // TODO Recheck
@@ -138,8 +151,8 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *res
 MGI_KERNEL void debugReset(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
 
 // Merge for resolve
-MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_CONST MGIReservoir *resolve, MGI_CONST int *clauses,
-                        MGI_CONST m_uint *clausesStarts, MGI_CONST m_uint *clauseOuts, MGI_GLOBAL int *newClause)
+MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_IN int *clauses,
+                        MGI_IN m_uint *clausesStarts, MGI_IN m_uint *clauseOuts, MGI_GLOBAL int *newClause)
 {
     MGI_GLOBAL int *iterOut = newClause + clauseOuts[MGI_GID_X];
     MGI_LOCAL MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;

@@ -33,18 +33,23 @@ extern "C" {
     #define MGI_SHARED local 
     #define MGI_CONST const constant
     #define MGI_LOCAL private 
+    #define MGI_IN global const
 
     #define MGI_BARRIER(flags) barrier(flags)
     #define MGI_MEM_GLOBAL CLK_GLOBAL_MEM_FENCE
     #define MGI_MEM_LOCAL CLK_LOCAL_MEM_FENCE
     #define MGI_MEM_IMAGE CLK_IMAGE_MEM_FENCE
 
+    #define MGI_UNROLL_HINT(hint) __attribute__((opencl_unroll_hint(hint)))
     #else
     #define MGI_GLOBAL  
+    #define MGI_IN 
     #define MGI_SHARED  
     #define MGI_CONST 
-    #define MGI_LOCAL  
+    #define MGI_LOCAL
         
+    #define MGI_UNROLL_HINT(hint)
+
     #define MGI_BARRIER(flags)
     #define MGI_MEM_GLOBAL 1
     #define MGI_MEM_LOCAL 2
@@ -136,7 +141,38 @@ MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST 
     atomic_flag_clear(&helper->flag);
 }
 
+MGI_K_INLINE void __internal_print_generic(MGI_GLOBAL MGIDebugHelper* helper, char* message) {
+    while(!atomic_flag_test_and_set(&helper->flag));
+    while (*message != 0 && helper->lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
+    {
+        if(helper->lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+            helper->overflowMessageCount++;
+        } else {
+            helper->messageBuffer[helper->lastIndex++] = *message;
+            message++;
+        }
+    }
+    if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+        helper->messageBuffer[helper->lastIndex++] = '\n';
+    }
+    if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
+        helper->messageBuffer[helper->lastIndex] = 0;
+    }
+    atomic_flag_clear(&helper->flag);
+}
+
 #define MGI_DEBUG_LOG(message) __internal_print(&info->__pDebugHelper, (MGI_CONST char*)(message))
+#define MGI_DEBUG_LOGG(message) __internal_print_generic(&info->__pDebugHelper, message)
+
+static char TRANS_NUMBER[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+MGI_K_INLINE void toString(char* ptr, m_uint number) {
+    for(uint x = 0; x < 8; x++) {
+        ptr[7 - x] = TRANS_NUMBER[(number & 15)];
+        number >>= 4;
+    }
+    ptr[8] = 0;
+}
 
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGI_LOCAL MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);
