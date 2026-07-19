@@ -29,6 +29,9 @@ private:
     size_t lastClauseAmount = 0;
     mgi::Memory currentReservoir;
     mgi::Memory mgiInfo;
+    mgi::Memory outputResolveIndices;
+    mgi::Memory outputResolve;
+    std::vector<std::vector<mgi::Memory>> pagesLoaded;
 
     const int pageSize {65536};
 
@@ -68,12 +71,16 @@ private:
                                    AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
                                  };
         auto memories = _mgi_api.allocate(allocations);
+        pagesLoaded.push_back(memories);
         if(lastClauseAmount < clauseAmount) { // Reallocate after size changes
-            const auto realloc = AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos);
-            const auto reservoirMemory = _mgi_api.allocate(from(realloc));
+            const std::array realloc = { AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
+            AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
+            const auto reservoirMemory = _mgi_api.allocate(realloc);
             // TODO COPY OLD
             if(currentReservoir) _mgi_api.freeObj(currentReservoir);
-            currentReservoir = reservoirMemory.back();
+            if(outputResolveIndices) _mgi_api.freeObj(outputResolveIndices);
+            currentReservoir = reservoirMemory[0];
+            outputResolveIndices = reservoirMemory[1];
             lastClauseAmount = clauseAmount;
         }
         _mgi_api.writeMemory(mgiInfo, from(BufferUpdateInfo::from(from(maxSize))));
@@ -92,6 +99,49 @@ private:
             tasksToRetire.push_back(lastTask);
         }
         lastTask = _mgi_api.queueTasks(from(taskInfo)).back();
+    }
+
+    inline std::vector<int> pullResolveFromGPU() {
+        using namespace mgi;
+        _mgi_api.waitTasks(from(lastTask));
+        for(const auto t : tasksToRetire) _mgi_api.freeObj(t);
+        _mgi_api.freeObj(lastTask);
+        tasksToRetire.clear();
+        lastTask = {};
+        // Compute outputs
+        TaskInfo taskInfo{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
+        taskInfo.kernel = this->resolutionKernel;
+        taskInfo.function = "clauseOuts";
+        taskInfo.descriptor.memory = {mgiInfo, currentReservoir, outputResolve};
+        taskInfo.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
+        _mgi_api.queueWaitTasks(from(taskInfo));
+
+        ReadInfo readSize{sizeof(uint32_t), lastClauseAmount * sizeof(uint32_t)};
+        uint32_t sizeRead = 0;
+        {
+            ReadLock lock = _mgi_api.readMemory(outputResolve, from(readSize));
+            sizeRead = *((uint32_t*)lock.ptr[0]);
+        }
+        const auto output = mgi::AllocationInfo::from(MemoryType::Global, sizeRead * sizeof(int));
+        if(outputResolve) _mgi_api.freeObj(outputResolve); // TODO Reuse if smaller
+        outputResolve = _mgi_api.allocate(from(output)).back();
+
+        // TODO use all pages
+        const auto& page = pagesLoaded.back();
+        TaskInfo resolveTask{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
+        resolveTask.kernel = this->resolutionKernel;
+        resolveTask.function = "resolve";
+        resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1], outputResolveIndices, outputResolve};
+        resolveTask.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
+        _mgi_api.queueWaitTasks(from(resolveTask));
+        for(const auto& page : pagesLoaded) {
+            for(const auto m : page) _mgi_api.freeObj(m);
+        }
+
+        ReadInfo readInfo{output.size};
+        ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
+        const auto start = (int*)lock.ptr[0];
+        return std::vector(start, start + sizeRead);
     }
 
     bool useBackgroundThreads = true;
@@ -191,9 +241,7 @@ private:
     // TODO(Nico) implement fetch
     // Should be called in the same thread as push
     // Not thread safe!
-    std::vector<int> fetchClausesFromGpu() {
-        _mgi_api.waitTasks(from(lastTask));
-        
-        return {};
+    std::vector<int> fetchClausesFromGpu() {        
+        return  pullResolveFromGPU();
     }
 };

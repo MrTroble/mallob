@@ -694,17 +694,15 @@ namespace mgi
 
         std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
         {
-            const auto &tasks = queueTasks(taskInfos, strategy);
+            const auto tasks = queueTasks(taskInfos, strategy);
             MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
+            for(const auto t : tasks) freeObj(t);
             return std::vector(tasks.size(), TaskStatus::Complete);
         }
 
         void waitTasks(span<const Task> tasks)
         {
             MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
-            #ifdef DEBUG
-            MGI_DB_CHECK(clFlush(selectQueue()), "Flush failed!");
-            #endif
         }
 
         std::vector<TaskStatus> getStatus(span<const Task> tasks)
@@ -727,6 +725,10 @@ namespace mgi
 
         inline void freeObj(Memory memory) {
             MGI_DB_CHECK(clRetainMemObject((cl_mem)memory.internal), "Free failed!");
+        }
+
+        inline void freeObj(Task task) {
+            MGI_DB_CHECK(clRetainEvent((cl_event)task.internal), "Free failed!");
         }
     };
 
