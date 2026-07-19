@@ -55,60 +55,46 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_CONST int 
     // TODO Check Register pressure
     // TODO Use shared cache for clause lookups
 
-    MGIReservoir currentReservoir = toResolve[MGI_GID_X];
+    MGI_LOCAL MGIReservoir currentReservoir = toResolve[MGI_GID_X];
     currentReservoir.weight = 0;
     currentReservoir.resolve.literal = 0;
-    MGI_CONST int *currentBegin = clauses + position;
-    MGI_CONST int *currentEnd = currentBegin + sizeOfClause;
+    const m_uint currentBegin = position;
+    const m_uint currentEnd = currentBegin + sizeOfClause;
 
     {
-        MGIResolveInfo resolve;
+        MGI_LOCAL MGIResolveInfo resolve;
         resolve.clauseOne = MGI_GID_X;
 
         MGI_LOCAL MGIRng rng;
         mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
-        const float maxValue = info->maxClauseSize;
+        const float maxValue = (float)info->maxClauseSize;
 
+        __attribute__((opencl_unroll_hint(1)))
         for (m_uint i = 0; i < MGI_GSIZE_Y; i++)
         {
             const m_uint index = (MGI_GID_X + i + 1) % MGI_GSIZE_X;
-            MGI_CONST int *otherBegin = clauses + clausesStarts[index];
-            MGI_CONST int *otherEnd = clauses + clausesStarts[index + 1] - 1;
-            MGI_CONST int *iter = currentBegin;
+            m_uint otherBegin = clausesStarts[index];
+            const m_uint otherEnd = clausesStarts[index + 1] - 1;
+            m_uint iter = currentBegin;
             resolve.literal = 0;
             resolve.clauseTwo = index;
             resolve.resolvedSize = 0;
-            while (!(otherBegin == otherEnd || iter == currentEnd)) // This calculates the heursitic and does merging
+            
+            __attribute__((opencl_unroll_hint(1)))
+            while (otherBegin < otherEnd && iter < currentEnd)
             {
-                int l1 = *iter;
-                int l2 = *otherBegin;
-                // TODO Make this mathematical
-                if (l1 == -l2)
-                {
-                    resolve.literal += (resolve.literal == 0 ? abs(l1) : 0);
-                    iter++;
-                    otherBegin++;
-                }
-                else if (l1 == l2)
-                {
-                    iter++;
-                    otherBegin++;
-                    resolve.resolvedSize++;
-                }
-                else
-                {
-                    l1 = abs(l1);
-                    l2 = abs(l2);
-                    if (l1 < l2)
-                    {
-                        iter++;
-                    }
-                    else
-                    {
-                        otherBegin++;
-                    }
-                    resolve.resolvedSize++;
-                }
+                const int l1 = clauses[iter];
+                const int l2 = clauses[otherBegin];
+                
+                const int l1A = abs(l1);
+                const int l2A = abs(l2);
+
+                resolve.literal += ((l1 == -l2 && resolve.literal == 0) ? l1A : 0);
+                resolve.resolvedSize += (l1 != -l2 ? 1:0);
+                const uint equal = l1A == l2A ? 1:0;
+                const uint oneSmalerTwo = l1A < l2A ? 1:0;
+                iter += oneSmalerTwo + equal;
+                otherBegin += (1 - oneSmalerTwo);
             }
             if (otherBegin != otherEnd)
             {

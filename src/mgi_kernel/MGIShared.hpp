@@ -2,6 +2,7 @@
 #define _MGI_SHARED
 
 typedef unsigned int m_uint;
+typedef unsigned long long m_ulong;
 
 #ifdef __cplusplus
 #include <atomic>
@@ -65,13 +66,13 @@ MGI_K_INLINE float mgiUintToFloat(m_uint x) {
     return u.b - 1.f;
 }
 
-MGI_K_INLINE void mgiRNGInit(MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
+MGI_K_INLINE void mgiRNGInit(MGI_LOCAL MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
     rng->seed.x = x ^ (id << 16);
     rng->seed.y = y ^ ((id + seedVal) << 16);
 }
 
 // returns random float between (0,1]
-MGI_K_INLINE float mgiRNGRndFloat(MGIRng* rng) {
+MGI_K_INLINE float mgiRNGRndFloat(MGI_LOCAL MGIRng* rng) {
     // PCG2D, as described here: https://jcgt.org/published/0009/03/02/
     rng->seed = 1664525u * rng->seed + 1013904223u;
     rng->seed.x += 1664525u * rng->seed.y;
@@ -137,7 +138,7 @@ MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST 
 
 #define MGI_DEBUG_LOG(message) __internal_print(&info->__pDebugHelper, (MGI_CONST char*)(message))
 
-MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGI_LOCAL MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);
     while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight) != value)
         value = atomic_load(&reservior->weight);
@@ -148,7 +149,7 @@ MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* res
     }
 }
 
-MGI_K_INLINE void mgiReserviorAddSample(MGIReservoir* reservior, MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
+MGI_K_INLINE void mgiReserviorAddSample(MGI_LOCAL MGIReservoir* reservior,MGI_LOCAL MGIRng* rng, MGI_LOCAL const MGIResolveInfo* resolve, float weight) {
     reservior->weight += weight;
     if((weight / reservior->weight) >= mgiRNGRndFloat(rng)) {
         reservior->resolve = *resolve;

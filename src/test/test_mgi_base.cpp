@@ -191,6 +191,8 @@ namespace test
 
     void testResolutionKernel()
     {
+        //LOG(V2_INFO, "KERNEL TEST DISABLED!\n");
+        //return;
         LOG(V2_INFO, "Begin Kernel TESTS on HOST!\n");
 
         // Test clauses: All positiv + All negativ
