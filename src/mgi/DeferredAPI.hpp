@@ -667,6 +667,7 @@ namespace mgi
                 uint32_t argID = 0;
                 for (auto desc : task.descriptor.memory)
                 {
+                    MGI_DB_CHECK(!(bool)desc, "Descriptor memory is not valid! ID: %u", argID);
                     MGI_DB_CHECK(clSetKernelArg(kernel, argID++, sizeof(cl_mem), &desc),
                                  "Could not set kernel %s arguments for descriptors!", task.function.c_str());
                 }

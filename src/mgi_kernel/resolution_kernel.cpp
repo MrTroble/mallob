@@ -78,11 +78,9 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
             resolve.literal = 0;
             resolve.clauseTwo = index;
             resolve.resolvedSize = 0;
-
-            const m_uint maxLoop = sizeOfClause + (otherEnd - otherBegin);
             
             MGI_UNROLL_HINT(1)
-            for (m_uint loop = 0; otherBegin < otherEnd && iter < currentEnd && loop < maxLoop; loop++)
+            while(otherBegin < otherEnd && iter < currentEnd)
             {
                 const int l1 = clauses[iter];
                 const int l2 = clauses[otherBegin];
@@ -117,9 +115,7 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolv
 {
     const m_uint current = MGI_GID_X + 1;
     clauseOuts[0] = 0; // TODO Recheck
-    {
-        clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
-    }
+    clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
 
     MGI_BARRIER(MGI_MEM_GLOBAL);
 

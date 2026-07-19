@@ -21,11 +21,12 @@ public:
         interface.pushClausesToGpu(value);
     }
 
-    void testWaitForTasks()
+    std::vector<int> testWaitForTasks()
     {
         auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
         LOG(V2_INFO, "Status: %d!\n", status);
-        while(status != TaskStatus::Complete) {
+        while (status != TaskStatus::Complete)
+        {
             status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
             LOG(V2_INFO, "Status: %d!\n", status);
             sleep(1);
@@ -34,11 +35,13 @@ public:
             interface._mgi_api.waitTasks(from(interface.lastTask));
         if (!interface.tasksToRetire.empty())
             interface._mgi_api.waitTasks(interface.tasksToRetire);
+        return interface.fetchClausesFromGpu();
     }
 
-    void getDebugOutput() {
+    void getDebugOutput()
+    {
         const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
-        MGIInfo* res = ((MGIInfo *)readLock.ptr[0]);
+        MGIInfo *res = ((MGIInfo *)readLock.ptr[0]);
         LOG(V5_DEBG, "Shader: %s", res->__pDebugHelper.messageBuffer);
         TaskInfo taskInfo{{}, TaskType::Burst, {1, 1, 1}};
         taskInfo.kernel = interface.resolutionKernel;
@@ -55,6 +58,23 @@ public:
         return copyRes;
     }
 };
+
+inline std::pair<std::vector<int>, std::vector<uint32_t>> mgi_generate(const std::vector<std::vector<int>> &values, uint32_t &sizeX)
+{
+    std::vector<int> assig;
+    std::vector<uint32_t> starts;
+    for (auto &vecs : values)
+    {
+        const auto current = assig.size();
+        starts.push_back(current);
+        assig.resize(current + vecs.size() + 1);
+        std::copy(vecs.begin(), vecs.end(), assig.begin() + current);
+        assig[current + vecs.size()] = 0;
+    }
+    starts.push_back(assig.size());
+    sizeX = values.size();
+    return {assig, starts};
+}
 
 void testRoutine()
 {
@@ -146,59 +166,68 @@ void testRoutine()
 
     LOG(V2_INFO, "GPU Clause Interface test\n");
 
-    InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
-
-    // Test clauses: All positiv + All negativ
-    const size_t elementsPerClaus = 16;
-    std::vector<int> clauses(2 * elementsPerClaus + 1);
-    clauses[elementsPerClaus] = 0;
-    for (size_t i = 0; i < elementsPerClaus; i++)
     {
-        clauses[i] = i + 1;
-        clauses[i + elementsPerClaus + 1] = -(int)i - 1;
+        InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
+
+        // Test clauses: All positiv + All negativ
+        const size_t elementsPerClaus = 16;
+        std::vector<int> clauses(2 * elementsPerClaus + 1);
+        clauses[elementsPerClaus] = 0;
+        for (size_t i = 0; i < elementsPerClaus; i++)
+        {
+            clauses[i] = i + 1;
+            clauses[i + elementsPerClaus + 1] = -(int)i - 1;
+        }
+        assert(GpuClauseInterface::canUseGPU());
+        gpuInterface.testGpuPush(clauses);
+        gpuInterface.testWaitForTasks();
+
+        LOG(V2_INFO, "Finished GPU Tasks\n");
+
+        gpuInterface.getDebugOutput();
+
+        const auto reservoirsLast = gpuInterface.testAfterPush(2);
+        assert(reservoirsLast[0].resolve.clauseOne == 0);
+        assert(reservoirsLast[0].resolve.clauseTwo == 1);
+        assert(reservoirsLast[0].resolve.literal == 1);
+        assert(reservoirsLast[0].resolve.resolvedSize == 0);
     }
-    assert(GpuClauseInterface::canUseGPU());
-    gpuInterface.testGpuPush(clauses);
-    gpuInterface.testWaitForTasks();
+    {
+        InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
 
-    LOG(V2_INFO, "Finished GPU Tasks\n");
+        uint32_t sizeX = 0;
+        auto [literals, ends] = mgi_generate({{1, -2, 3}, {1, 5, 6}, {1, 2, 6}}, sizeX); // 1 and 3 are resolvable
+        gpuInterface.testGpuPush(literals);
+        const auto toTest = gpuInterface.testWaitForTasks();
+        assert(toTest[0] == 1);
+        assert(toTest[1] == 3);
+        assert(toTest[2] == 6);
 
-    gpuInterface.getDebugOutput();
-    
-    const auto reservoirsLast = gpuInterface.testAfterPush(2);
-    assert(reservoirsLast[0].resolve.clauseOne == 0);
-    assert(reservoirsLast[0].resolve.clauseTwo == 1);
-    assert(reservoirsLast[0].resolve.literal == 1);
-    assert(reservoirsLast[0].resolve.resolvedSize == 0);
+        LOG(V2_INFO, "Finished GPU Tasks\n");
 
+        gpuInterface.getDebugOutput();
+
+        const auto reservoirsLast = gpuInterface.testAfterPush(3);
+        assert(reservoirsLast[2].resolve.clauseOne == 2);
+        assert(reservoirsLast[2].resolve.clauseTwo == 0);
+        assert(reservoirsLast[2].resolve.literal == 2);
+        assert(reservoirsLast[2].resolve.resolvedSize == 3);
+    }
     LOG(V2_INFO, "Finished Clause Interface test\n");
 }
 
 namespace test
 {
-#include "mgi_kernel/resolution_kernel.cpp"
-
+    #include "mgi_kernel/resolution_kernel.cpp"
     inline std::pair<std::vector<int>, std::vector<uint32_t>> generate(const std::vector<std::vector<int>> &values)
     {
-        std::vector<int> assig;
-        std::vector<uint32_t> starts;
-        for (auto &vecs : values)
-        {
-            const auto current = assig.size();
-            starts.push_back(current);
-            assig.resize(current + vecs.size() + 1);
-            std::copy(vecs.begin(), vecs.end(), assig.begin() + current);
-            assig[current + vecs.size()] = 0;
-        }
-        starts.push_back(assig.size());
-        MGI_GSIZE_X = values.size();
-        return {assig, starts};
+        return mgi_generate(values, MGI_GSIZE_X);
     }
 
     void testResolutionKernel()
     {
-        //LOG(V2_INFO, "KERNEL TEST DISABLED!\n");
-        //return;
+        // LOG(V2_INFO, "KERNEL TEST DISABLED!\n");
+        // return;
         LOG(V2_INFO, "Begin Kernel TESTS on HOST!\n");
 
         // Test clauses: All positiv + All negativ
@@ -303,9 +332,9 @@ namespace test
 int main(int argc, char *argv[])
 {
 
-    //MyMpi::init();
+    // MyMpi::init();
     Timer::init();
-    int rank = 0; //MyMpi::rank(MPI_COMM_WORLD);
+    int rank = 0; // MyMpi::rank(MPI_COMM_WORLD);
 
     Process::init(rank);
 
@@ -314,7 +343,7 @@ int main(int argc, char *argv[])
 
     Parameters params;
     params.init(argc, argv);
-    //MyMpi::setOptions(params);
+    // MyMpi::setOptions(params);
 
     test::testResolutionKernel();
     testRoutine();

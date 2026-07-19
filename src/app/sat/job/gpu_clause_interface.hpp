@@ -17,12 +17,14 @@ class InterfaceTestGpuClause;
 // Manages data flow from and to the GPU.
 // Owned by ForkedSatJob (same life scope as the DeferredAPI object),
 // supplied to AnytimeSatClauseCommunicator by reference.
-class GpuClauseInterface {
-friend InterfaceTestGpuClause;
+class GpuClauseInterface
+{
+    friend InterfaceTestGpuClause;
+
 private:
-    mgi::DeferredAPI& _mgi_api;
+    mgi::DeferredAPI &_mgi_api;
     StaticClauseStore<true> _post_buffer;
-    
+
     mgi::Kernel resolutionKernel;
     mgi::Task lastTask;
     std::vector<mgi::Task> tasksToRetire;
@@ -33,11 +35,12 @@ private:
     mgi::Memory outputResolve;
     std::vector<std::vector<mgi::Memory>> pagesLoaded;
 
-    const int pageSize {65536};
+    const int pageSize{65536};
 
     // TODO getLoad() function or sth similar?
     // Function called from within (?)
-    inline void pushClausesToGpu(mgi::span<const int> values) {
+    inline void pushClausesToGpu(mgi::span<const int> values)
+    {
         // TODO add compression stages and use the correct kernel
         using namespace mgi;
 
@@ -47,38 +50,48 @@ private:
         uint32_t maxSize = 0;
         // TODO Do not extra copy! Sort somewhere else
         std::vector<int> copy(values.begin(), values.end());
-        for (auto i = std::find(values.begin(), values.end(), 0); 
-                  i != values.end(); i = std::find(i + 1, values.end(), 0))
+        for (auto i = std::find(values.begin(), values.end(), 0);
+             i != values.end(); i = std::find(i + 1, values.end(), 0))
         {
             const auto last = prefixes.back();
             const auto current = std::distance(values.begin(), i);
             prefixes.push_back(current + 1);
             maxSize = std::max(maxSize, (uint32_t)(current - last));
-            std::sort(copy.begin() + last, copy.begin() + current, [] (auto valueL, auto valueR) { return abs(valueL) < abs(valueR); });
+            std::sort(copy.begin() + last, copy.begin() + current, [](auto valueL, auto valueR)
+                      { return abs(valueL) < abs(valueR); });
         }
         maxSize *= maxSize; // Could be quadratic
 
-        const auto clauseAmount = prefixes.size();
+        auto clauseAmount = prefixes.size();
         // Past the end
         const auto last = prefixes.back();
-        std::sort(copy.begin() + last, copy.end(), [] (auto valueL, auto valueR) { return abs(valueL) < abs(valueR); });
-        prefixes.push_back(std::distance(values.begin(), values.end()) + 1);
-
+        if (last < values.size())
+        {
+            std::sort(copy.begin() + last, copy.end(), [](auto valueL, auto valueR)
+                      { return abs(valueL) < abs(valueR); });
+            prefixes.push_back(std::distance(values.begin(), values.end()) + 1);
+        } else {
+            clauseAmount--; // We have a trailing zero;
+        }
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
-        std::array allocations = { AllocationInfo::from<int>(MemoryType::Constant, copy), // TODO remove copy
-                                   AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
-                                 };
+        std::array allocations = {
+            AllocationInfo::from<int>(MemoryType::Constant, copy),         // TODO remove copy
+            AllocationInfo::from<uint32_t>(MemoryType::Constant, prefixes) // CTAD is bad in 17 ... :(
+        };
         auto memories = _mgi_api.allocate(allocations);
         pagesLoaded.push_back(memories);
-        if(lastClauseAmount < clauseAmount) { // Reallocate after size changes
-            const std::array realloc = { AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
-            AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
+        if (lastClauseAmount < clauseAmount)
+        { // Reallocate after size changes
+            const std::array realloc = {AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
+                                        AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
             const auto reservoirMemory = _mgi_api.allocate(realloc);
             // TODO COPY OLD
-            if(currentReservoir) _mgi_api.freeObj(currentReservoir);
-            if(outputResolveIndices) _mgi_api.freeObj(outputResolveIndices);
+            if (currentReservoir)
+                _mgi_api.freeObj(currentReservoir);
+            if (outputResolveIndices)
+                _mgi_api.freeObj(outputResolveIndices);
             currentReservoir = reservoirMemory[0];
             outputResolveIndices = reservoirMemory[1];
             lastClauseAmount = clauseAmount;
@@ -94,17 +107,20 @@ private:
         taskInfo.descriptor.memory = memories;
         taskInfo.groupSizes[0] = std::min(clauseAmount, (size_t)4);
         taskInfo.groupSizes[1] = std::min(sizeOfY, (size_t)4);
-        if(lastTask) {
+        if (lastTask)
+        {
             taskInfo.waitForTasks.push_back(lastTask);
             tasksToRetire.push_back(lastTask);
         }
         lastTask = _mgi_api.queueTasks(from(taskInfo)).back();
     }
 
-    inline std::vector<int> pullResolveFromGPU() {
+    inline std::vector<int> pullResolveFromGPU()
+    {
         using namespace mgi;
         _mgi_api.waitTasks(from(lastTask));
-        for(const auto t : tasksToRetire) _mgi_api.freeObj(t);
+        for (const auto t : tasksToRetire)
+            _mgi_api.freeObj(t);
         _mgi_api.freeObj(lastTask);
         tasksToRetire.clear();
         lastTask = {};
@@ -112,122 +128,146 @@ private:
         TaskInfo taskInfo{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
         taskInfo.kernel = this->resolutionKernel;
         taskInfo.function = "clauseOuts";
-        taskInfo.descriptor.memory = {mgiInfo, currentReservoir, outputResolve};
+        taskInfo.descriptor.memory = {mgiInfo, currentReservoir, outputResolveIndices};
         taskInfo.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
         _mgi_api.queueWaitTasks(from(taskInfo));
 
         ReadInfo readSize{sizeof(uint32_t), lastClauseAmount * sizeof(uint32_t)};
         uint32_t sizeRead = 0;
         {
-            ReadLock lock = _mgi_api.readMemory(outputResolve, from(readSize));
-            sizeRead = *((uint32_t*)lock.ptr[0]);
+            ReadLock lock = _mgi_api.readMemory(outputResolveIndices, from(readSize));
+            sizeRead = *((uint32_t *)lock.ptr[0]);
+        }
+        if (sizeRead == 0)
+        {
+            LOG(V3_VERB, "No resolvents found!\n");
+            return {};
         }
         const auto output = mgi::AllocationInfo::from(MemoryType::Global, sizeRead * sizeof(int));
-        if(outputResolve) _mgi_api.freeObj(outputResolve); // TODO Reuse if smaller
+        if (outputResolve)
+            _mgi_api.freeObj(outputResolve); // TODO Reuse if smaller
         outputResolve = _mgi_api.allocate(from(output)).back();
 
         // TODO use all pages
-        const auto& page = pagesLoaded.back();
+        const auto &page = pagesLoaded.back();
         TaskInfo resolveTask{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
         resolveTask.kernel = this->resolutionKernel;
         resolveTask.function = "resolve";
         resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1], outputResolveIndices, outputResolve};
         resolveTask.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
         _mgi_api.queueWaitTasks(from(resolveTask));
-        for(const auto& page : pagesLoaded) {
-            for(const auto m : page) _mgi_api.freeObj(m);
+        for (const auto &page : pagesLoaded)
+        {
+            for (const auto m : page)
+                _mgi_api.freeObj(m);
         }
 
         ReadInfo readInfo{output.size};
         ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
-        const auto start = (int*)lock.ptr[0];
+        const auto start = (int *)lock.ptr[0];
         return std::vector(start, start + sizeRead);
     }
 
     bool useBackgroundThreads = true;
+
 public:
-    GpuClauseInterface(mgi::DeferredAPI& mgiApi, const Parameters& params, bool useBackgroundThreads = true) : _mgi_api(mgiApi),
-            _post_buffer(params, false, 256, true, 1<<20) {
+    GpuClauseInterface(mgi::DeferredAPI &mgiApi, const Parameters &params, bool useBackgroundThreads = true) : _mgi_api(mgiApi),
+                                                                                                               _post_buffer(params, false, 256, true, 1 << 20)
+    {
         using namespace mgi;
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
         mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Global, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
-        if(useBackgroundThreads)
+        if (useBackgroundThreads)
             launchBackgroundThreads();
     }
-    ~GpuClauseInterface() {
-        if(useBackgroundThreads)
+    ~GpuClauseInterface()
+    {
+        if (useBackgroundThreads)
             joinBackgroundThreads();
     }
 
-    inline constexpr static bool canUseGPU() {
-        #ifdef MALLOB_USE_GPU
-            return true;
-        #else
-            return false;
-        #endif
+    inline constexpr static bool canUseGPU()
+    {
+#ifdef MALLOB_USE_GPU
+        return true;
+#else
+        return false;
+#endif
     }
 
     // Called from MPI (sharing) side
-    void insertOriginalClauses(mgi::span<const int> values) {
+    void insertOriginalClauses(mgi::span<const int> values)
+    {
         insertClausesFromSharing(values); // TODO(Dominik) any special treatment needed?
     }
 
     // Called from MPI (sharing) side
-    void insertClausesFromSharing(mgi::span<const int> values) {
+    void insertClausesFromSharing(mgi::span<const int> values)
+    {
         _pre_buffer.insert(values.begin(), values.end());
     }
 
     // Called from MPI (sharing) side
-    std::vector<int> retrieveClausesToShare(int limit) {
+    std::vector<int> retrieveClausesToShare(int limit)
+    {
         int nbExportedClauses, nbExportedLits;
         return _post_buffer.exportBuffer(limit, nbExportedClauses, nbExportedLits);
     }
 
 private:
     // Our two background workers:
-    std::future<void> _fut_pre; // prepares and submits GPU tasks
+    std::future<void> _fut_pre;  // prepares and submits GPU tasks
     std::future<void> _fut_post; // retrieves and processes GPU results
-    bool _terminate {false};
+    bool _terminate{false};
 
     EnvironmentalClauseStore _pre_buffer;
 
-    void launchBackgroundThreads() {
-        if (!canUseGPU()) return;
-        _fut_pre = ProcessWideThreadPool::get().addTask([&]() {
-            runPrepareGpuCalls();
-        });
-        _fut_post = ProcessWideThreadPool::get().addTask([&]() {
-            runProcessGpuResults();
-        });
+    void launchBackgroundThreads()
+    {
+        if (!canUseGPU())
+            return;
+        _fut_pre = ProcessWideThreadPool::get().addTask([&]()
+                                                        { runPrepareGpuCalls(); });
+        _fut_post = ProcessWideThreadPool::get().addTask([&]()
+                                                         { runProcessGpuResults(); });
     }
-    void joinBackgroundThreads() {
+    void joinBackgroundThreads()
+    {
         _terminate = true;
-        if (_fut_pre.valid()) _fut_pre.get();
-        if (_fut_post.valid()) _fut_post.get();
+        if (_fut_pre.valid())
+            _fut_pre.get();
+        if (_fut_post.valid())
+            _fut_post.get();
     }
 
-    void runPrepareGpuCalls() {
-        while (!_terminate) {
+    void runPrepareGpuCalls()
+    {
+        while (!_terminate)
+        {
             // Occasionally prepare a page of cohesive clauses
             // from the prebuffer and forward it to the GPU.
-            const auto& clauses = _pre_buffer.getSelection(pageSize);
+            const auto &clauses = _pre_buffer.getSelection(pageSize);
             pushClausesToGpu(mgi::span<const int>(clauses));
 
             // TODO find a better periodicity / trigger
             usleep(1000 * 1000); // 1s
         }
     }
-    void runProcessGpuResults() {
-        while (!_terminate) {
+    void runProcessGpuResults()
+    {
+        while (!_terminate)
+        {
             // Occasionally retrieve clauses from the GPU
             // and insert them into the postbuffer.
             auto clauses = fetchClausesFromGpu();
             int clausePos = 0;
-            for (int i = 0; i < clauses.size(); i++) {
-                if (clauses[i] == 0) {
-                    _post_buffer.addClause({clauses.data() + clausePos, i-clausePos, i-clausePos});
-                    clausePos = i+1;
+            for (int i = 0; i < clauses.size(); i++)
+            {
+                if (clauses[i] == 0)
+                {
+                    _post_buffer.addClause({clauses.data() + clausePos, i - clausePos, i - clausePos});
+                    clausePos = i + 1;
                 }
             }
 
@@ -235,13 +275,14 @@ private:
             usleep(1000 * 1000); // 1s
         }
     }
-    
+
     inline mgi::Memory getFromCacheOr();
 
     // TODO(Nico) implement fetch
     // Should be called in the same thread as push
     // Not thread safe!
-    std::vector<int> fetchClausesFromGpu() {        
-        return  pullResolveFromGPU();
+    std::vector<int> fetchClausesFromGpu()
+    {
+        return pullResolveFromGPU();
     }
 };
