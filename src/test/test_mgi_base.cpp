@@ -178,7 +178,7 @@ void testRoutine()
         gpuInterface.testWaitForTasks();
 
         LOG(V2_INFO, "Finished GPU Tasks\n");
-        
+
         gpuInterface.print();
 
         const auto reservoirsLast = gpuInterface.testAfterPush(2);
@@ -194,6 +194,15 @@ void testRoutine()
         auto [literals, ends] = mgi_generate({{1, -2, 3}, {1, 5, 6}, {1, 2, 6}}, sizeX); // 1 and 3 are resolvable
         gpuInterface.testGpuPush(literals);
         const auto toTest = gpuInterface.testWaitForTasks();
+
+        std::string toTestStr = "Resolved: ";
+        for (auto x : toTest)
+            toTestStr += std::to_string(x) + ",";
+        toTestStr += "\nFrom: ";
+        for (auto x : literals)
+            toTestStr += std::to_string(x) + ",";
+        LOG(V2_INFO, "%s\n", toTestStr.c_str());
+
         assert(toTest[0] == 1);
         assert(toTest[1] == 3);
         assert(toTest[2] == 6);
@@ -221,8 +230,6 @@ namespace test
 
     void testResolutionKernel()
     {
-        // LOG(V2_INFO, "KERNEL TEST DISABLED!\n");
-        // return;
         LOG(V2_INFO, "Begin Kernel TESTS on HOST!\n");
 
         // Test clauses: All positiv + All negativ

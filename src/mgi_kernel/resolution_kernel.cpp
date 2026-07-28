@@ -153,7 +153,7 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 
     MGI_LOCAL MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
     
     const m_uint pageIndex = clausesStarts[MGI_GSIZE_X + 1];
-    if (localResolve.resolvedSize == 0 || localResolve.page != pageIndex)
+    if (localResolve.literal == 0 || localResolve.resolvedSize == 0 || localResolve.page != pageIndex)
         return;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];
     m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart - 1;

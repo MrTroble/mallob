@@ -137,7 +137,6 @@ private:
         taskInfo.descriptor.memory = {mgiInfo, currentReservoir, outputResolveIndices};
         taskInfo.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
         _mgi_api.queueWaitTasks(from(taskInfo));
-        printDebugOutput(_mgi_api, resolutionKernel, mgiInfo);
 
         ReadInfo readSize{sizeof(uint32_t), lastClauseAmount * sizeof(uint32_t)};
         uint32_t sizeRead = 0;
@@ -168,6 +167,8 @@ private:
             tasks[pageIdx++] = resolveTask;
         }
         _mgi_api.queueWaitTasks(tasks);
+        printDebugOutput(_mgi_api, resolutionKernel, mgiInfo);
+
         for (const auto &page : pagesLoaded)
         {
             for (const auto m : page)

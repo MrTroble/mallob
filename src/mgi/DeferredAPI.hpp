@@ -693,18 +693,18 @@ namespace mgi
             MGI_DB_CHECK(clFlush(queue), "Could not flush!");
             return returnTasks;
         }
+        
+        void waitTasks(span<const Task> tasks)
+        {
+            MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
+        }
 
         std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
         {
             const auto tasks = queueTasks(taskInfos, strategy);
-            MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
+            waitTasks(tasks);
             for(const auto t : tasks) freeObj(t);
             return std::vector(tasks.size(), TaskStatus::Complete);
-        }
-
-        void waitTasks(span<const Task> tasks)
-        {
-            MGI_DB_CHECK(clWaitForEvents(tasks.size(), (cl_event *)tasks.data()), "Wait Tasks failed!");
         }
 
         std::vector<TaskStatus> getStatus(span<const Task> tasks)
