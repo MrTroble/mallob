@@ -7,6 +7,7 @@
 #include "util/sys/process.hpp"
 #include "mgi/KernelLoader.hpp"
 #include "mgi/DeferredAPI.hpp"
+#include "mgi/MGIHelper.hpp"
 #include "app/sat/job/gpu_clause_interface.hpp"
 
 using namespace mgi;
@@ -38,16 +39,9 @@ public:
         return interface.fetchClausesFromGpu();
     }
 
-    void getDebugOutput()
+    inline void print()
     {
-        const auto readLock = interface._mgi_api.readMemory(interface.mgiInfo, from(ReadInfo{sizeof(MGIInfo)}));
-        MGIInfo *res = ((MGIInfo *)readLock.ptr[0]);
-        LOG(V5_DEBG, "Shader: %s", res->__pDebugHelper.messageBuffer);
-        TaskInfo taskInfo{{}, TaskType::Burst, {1, 1, 1}};
-        taskInfo.kernel = interface.resolutionKernel;
-        taskInfo.function = "debugReset";
-        taskInfo.descriptor.memory.push_back(interface.mgiInfo);
-        interface._mgi_api.queueWaitTasks(from(taskInfo));
+        printDebugOutput(interface._mgi_api, interface.resolutionKernel, interface.mgiInfo);
     }
 
     std::vector<MGIReservoir> testAfterPush(size_t count)
@@ -73,6 +67,7 @@ inline std::pair<std::vector<int>, std::vector<uint32_t>> mgi_generate(const std
     }
     starts.push_back(assig.size());
     sizeX = values.size();
+    starts.push_back(0); // PAGE ID at the end
     return {assig, starts};
 }
 
@@ -183,8 +178,8 @@ void testRoutine()
         gpuInterface.testWaitForTasks();
 
         LOG(V2_INFO, "Finished GPU Tasks\n");
-
-        gpuInterface.getDebugOutput();
+        
+        gpuInterface.print();
 
         const auto reservoirsLast = gpuInterface.testAfterPush(2);
         assert(reservoirsLast[0].resolve.clauseOne == 0);
@@ -205,7 +200,7 @@ void testRoutine()
 
         LOG(V2_INFO, "Finished GPU Tasks\n");
 
-        gpuInterface.getDebugOutput();
+        gpuInterface.print();
 
         const auto reservoirsLast = gpuInterface.testAfterPush(3);
         assert(reservoirsLast[2].resolve.clauseOne == 2);
@@ -218,7 +213,7 @@ void testRoutine()
 
 namespace test
 {
-    #include "mgi_kernel/resolution_kernel.cpp"
+#include "mgi_kernel/resolution_kernel.cpp"
     inline std::pair<std::vector<int>, std::vector<uint32_t>> generate(const std::vector<std::vector<int>> &values)
     {
         return mgi_generate(values, MGI_GSIZE_X);
@@ -241,6 +236,7 @@ namespace test
         }
 
         std::vector<uint32_t> beginings{0, elementsPerClaus + 1, 2 * elementsPerClaus + 2};
+        beginings.push_back(0); // Page ID
         std::vector<MGIResolveInfo> resolves(2);
         findResolvents(clauses.data(), beginings.data(), resolves.data());
         MGIResolveInfo localResolve = resolves[0];

@@ -181,6 +181,21 @@ MGI_K_INLINE void toString(char* ptr, m_uint number) {
     ptr[8] = 0;
 }
 
+MGI_K_INLINE void printNumber(m_uint number, MGI_GLOBAL MGIDebugHelper* helper) {
+    char buffer[16];
+    toString(buffer, number);
+    __internal_print_generic(helper, buffer);
+}
+
+MGI_K_INLINE void printNumbers(m_uint number[], m_uint count, MGI_GLOBAL MGIDebugHelper* helper) {
+    char buffer[64];
+    for(m_uint i = 0; i < count; i++) {
+        toString(buffer + i * 9, number[i]);
+        buffer[(i + 1) * 9 - 1] = ',';
+    }
+    __internal_print_generic(helper, buffer);
+}
+
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGI_LOCAL MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);
     while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight) != value)

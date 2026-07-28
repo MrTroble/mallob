@@ -54,15 +54,25 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
     // TODO Use LOCAL reservoir and ONLY MERGE AT THE END! Shuffle reservoirs
     // TODO Check Register pressure
     // TODO Use shared cache for clause lookups
+    const m_uint pageIndex = clausesStarts[MGI_GSIZE_X + 1];
 
-    MGI_LOCAL MGIReservoir currentReservoir = toResolve[MGI_GID_X];
-    currentReservoir.weight = 0;
-    currentReservoir.resolve.literal = 0;
+    MGI_LOCAL MGIReservoir currentReservoir;
+    if(pageIndex == 0) {
+        currentReservoir.weight = 0;
+        currentReservoir.resolve.literal = 0;
+        currentReservoir.resolve.page = 0;
+    }
+    else {
+        currentReservoir = toResolve[MGI_GID_X];
+    }
+
     const m_uint currentBegin = position;
     const m_uint currentEnd = currentBegin + sizeOfClause;
+
     {
         MGI_LOCAL MGIResolveInfo resolve;
         resolve.clauseOne = MGI_GID_X;
+        resolve.page = pageIndex;
 
         MGI_LOCAL MGIRng rng;
         mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
@@ -114,8 +124,9 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
 MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
 {
     const m_uint current = MGI_GID_X + 1;
+    const MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
     clauseOuts[0] = 0; // TODO Recheck
-    clauseOuts[current] = resolve[MGI_GID_X].resolve.resolvedSize;
+    clauseOuts[current] = localResolve.literal != 0 ? localResolve.resolvedSize : 0;
 
     MGI_BARRIER(MGI_MEM_GLOBAL);
 
@@ -140,7 +151,9 @@ MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 
 {
     MGI_GLOBAL int *iterOut = newClause + clauseOuts[MGI_GID_X];
     MGI_LOCAL MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
-    if (localResolve.resolvedSize == 0)
+    
+    const m_uint pageIndex = clausesStarts[MGI_GSIZE_X + 1];
+    if (localResolve.resolvedSize == 0 || localResolve.page != pageIndex)
         return;
     m_uint firstStart = clausesStarts[localResolve.clauseOne];
     m_uint sizeFirst = clausesStarts[localResolve.clauseOne + 1] - firstStart - 1;

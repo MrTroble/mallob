@@ -730,6 +730,7 @@ namespace mgi
             size_t index = 0;
             for (const auto &info : copyInfos)
             {
+                assert(source && destination && "Source or destination memory is not valid!");
                 MGI_DB_CHECK(clEnqueueCopyBuffer(queue, (cl_mem)source.internal, (cl_mem)destination.internal, info.srcOffset, info.destOffset, info.size, 0, nullptr, &events[index++]),
                              "Could not enqueue copy buffer!");
             }

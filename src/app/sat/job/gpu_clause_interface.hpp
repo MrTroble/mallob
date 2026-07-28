@@ -8,6 +8,7 @@
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
 #include "mgi/DeferredAPI.hpp"
+#include "mgi/MGIHelper.hpp"
 #include "mgi_kernel/MGIShared.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/data/environmental_clause_store.hpp"
@@ -75,7 +76,8 @@ private:
         {
             clauseAmount--; // We have a trailing zero;
         }
-        prefixes.push_back(pagesLoaded.size());
+
+        prefixes.push_back(pagesLoaded.size()); // ADD CURRENT PAGE ID AT THE END
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
@@ -90,9 +92,10 @@ private:
             const std::array realloc = {AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
                                         AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
             const auto reservoirMemory = _mgi_api.allocate(realloc);
-            _mgi_api.copyMemoryWait(currentReservoir, reservoirMemory[0], from(MemoryCopyInfo{lastClauseAmount * sizeof(MGIReservoir)}));
-            if (currentReservoir)
+            if (currentReservoir) {
+                _mgi_api.copyMemoryWait(currentReservoir, reservoirMemory[0], from(MemoryCopyInfo{lastClauseAmount * sizeof(MGIReservoir)}));
                 _mgi_api.freeObj(currentReservoir);
+            }
             if (outputResolveIndices)
                 _mgi_api.freeObj(outputResolveIndices);
             currentReservoir = reservoirMemory[0];
@@ -134,6 +137,7 @@ private:
         taskInfo.descriptor.memory = {mgiInfo, currentReservoir, outputResolveIndices};
         taskInfo.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
         _mgi_api.queueWaitTasks(from(taskInfo));
+        printDebugOutput(_mgi_api, resolutionKernel, mgiInfo);
 
         ReadInfo readSize{sizeof(uint32_t), lastClauseAmount * sizeof(uint32_t)};
         uint32_t sizeRead = 0;
