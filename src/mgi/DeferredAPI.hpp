@@ -721,8 +721,28 @@ namespace mgi
             return status;
         }
     
-        void copyMemory(Memory m1, Memory m2, span<const MemoryCopyInfo> copyInfos) {
+        Task copyMemory(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos) {
+            
+            const auto queue = selectQueue();
+            std::vector<cl_event> events(copyInfos.size());
+            mgi::OnExit raiiEventsHandle([&]()
+                                         { for(auto event : events) clRetainEvent(event); });
+            size_t index = 0;
+            for (const auto &info : copyInfos)
+            {
+                MGI_DB_CHECK(clEnqueueCopyBuffer(queue, (cl_mem)source.internal, (cl_mem)destination.internal, info.srcOffset, info.destOffset, info.size, 0, nullptr, &events[index++]),
+                             "Could not enqueue copy buffer!");
+            }
+            cl_event userEvent;
+            const auto error = clEnqueueMarkerWithWaitList(queue, events.size(), events.data(), &userEvent);
+            MGI_DB_CHECK(error, "Could not create user event!");
+            return Task{(size_t)userEvent};
+        }
 
+        void copyMemoryWait(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos) {
+            const auto task = copyMemory(source, destination, copyInfos);
+            MGI_DB_CHECK(clWaitForEvents(1, (cl_event *)&task.internal), "Wait for copy memory failed!");
+            freeObj(task);
         }
 
         inline void freeObj(Memory memory) {

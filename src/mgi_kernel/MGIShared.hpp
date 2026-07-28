@@ -24,6 +24,7 @@ extern "C" {
     typedef std::atomic<float> atomic_float;
 
     #define MGI_K_INLINE inline
+
 #else
     #define MGI_K_INLINE
 #endif
@@ -41,7 +42,12 @@ extern "C" {
     #define MGI_MEM_IMAGE CLK_IMAGE_MEM_FENCE
 
     #define MGI_UNROLL_HINT(hint) __attribute__((opencl_unroll_hint(hint)))
+
+    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; struct __##name
     #else
+
+    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; struct __##name
+
     #define MGI_GLOBAL  
     #define MGI_IN 
     #define MGI_SHARED  
@@ -55,7 +61,7 @@ extern "C" {
     #define MGI_MEM_LOCAL 2
     #define MGI_MEM_IMAGE 4
     #endif
-    
+
 typedef uint2 m_uint2;
 
 typedef struct __mgi_rng {
@@ -90,36 +96,37 @@ MGI_K_INLINE float mgiRNGRndFloat(MGI_LOCAL MGIRng* rng) {
     return 1.f - mgiUintToFloat(rng->seed.x);
 }
 
-typedef struct __mgi_resolve_info {
+MGI_STRUCT(MGIResolveInfo) {
     int literal;
     m_uint clauseOne;
     m_uint clauseTwo;
     m_uint resolvedSize;
-} MGIResolveInfo;
+    m_uint page;
+};
 
-typedef struct __mgi_atomic_reservoir {
+MGI_STRUCT(MGIAtomicReservoir) {
     MGIResolveInfo resolve;
     atomic_float weight;
-} MGIAtomicReservoir;
+};
 
-typedef struct __mgi_reservoir {
+MGI_STRUCT(MGIReservoir) {
     MGIResolveInfo resolve;
     float weight;
-} MGIReservoir;
+};
 
 #define MGI_MAX_DEBUG_MESSAGE_SPACE 1024
 
-typedef struct __mgi_debug_helper {
+MGI_STRUCT(MGIDebugHelper) {
     char messageBuffer[MGI_MAX_DEBUG_MESSAGE_SPACE];
     m_uint lastIndex;
     m_uint overflowMessageCount;
     atomic_flag flag;
-} MGIDebugHelper;
+};
 
-typedef struct __mgi_info {
+MGI_STRUCT(MGIInfo) {
     m_uint maxClauseSize;
     MGIDebugHelper __pDebugHelper;
-} MGIInfo;
+};
 
 MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST char* message) {
     while(!atomic_flag_test_and_set(&helper->flag));

@@ -70,9 +70,12 @@ private:
             std::sort(copy.begin() + last, copy.end(), [](auto valueL, auto valueR)
                       { return abs(valueL) < abs(valueR); });
             prefixes.push_back(std::distance(values.begin(), values.end()) + 1);
-        } else {
+        }
+        else
+        {
             clauseAmount--; // We have a trailing zero;
         }
+        prefixes.push_back(pagesLoaded.size());
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
@@ -87,7 +90,7 @@ private:
             const std::array realloc = {AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
                                         AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
             const auto reservoirMemory = _mgi_api.allocate(realloc);
-            // TODO COPY OLD
+            _mgi_api.copyMemoryWait(currentReservoir, reservoirMemory[0], from(MemoryCopyInfo{lastClauseAmount * sizeof(MGIReservoir)}));
             if (currentReservoir)
                 _mgi_api.freeObj(currentReservoir);
             if (outputResolveIndices)
@@ -149,13 +152,18 @@ private:
         outputResolve = _mgi_api.allocate(from(output)).back();
 
         // TODO use all pages
-        const auto &page = pagesLoaded.back();
-        TaskInfo resolveTask{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
-        resolveTask.kernel = this->resolutionKernel;
-        resolveTask.function = "resolve";
-        resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1], outputResolveIndices, outputResolve};
-        resolveTask.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
-        _mgi_api.queueWaitTasks(from(resolveTask));
+        std::vector<TaskInfo> tasks(pagesLoaded.size());
+        size_t pageIdx = 0;
+        for (const auto &page : pagesLoaded)
+        {
+            TaskInfo resolveTask{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
+            resolveTask.kernel = this->resolutionKernel;
+            resolveTask.function = "resolve";
+            resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1], outputResolveIndices, outputResolve};
+            resolveTask.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
+            tasks[pageIdx++] = resolveTask;
+        }
+        _mgi_api.queueWaitTasks(tasks);
         for (const auto &page : pagesLoaded)
         {
             for (const auto m : page)
