@@ -294,6 +294,7 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     #vulkan compiles
     foreach(file ${kernelfiles})
         cmake_path(GET file FILENAME filename)
+
         if(${filename} MATCHES ".*\\.cpp$")
         add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv" 
         COMMAND $ENV{VULKAN_SDK}/bin/glslc -std=460core --target-env=vulkan1.3 "-fshader-stage=comp" -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-DMGI_API_VULKAN=1" 
