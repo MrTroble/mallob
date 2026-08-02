@@ -15,7 +15,7 @@ bool checkIsInverseIn(int clause, MGI_IN int *literalsBegin, MGI_IN int *literal
 // TODO Reservoir based picking that only use different
 // use MGI_LOCAL MGIReservoir in order to only have atomics from each work group
 
-MGI_KERNEL void findResolvents(MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, MGI_GLOBAL MGIResolveInfo *toResolve)
+MGI_KERNEL(findResolvents) (MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, MGI_GLOBAL MGIResolveInfo *toResolve)
 {
     const m_uint x = MGI_GID_X;
     const m_uint position = clausesStarts[x];
@@ -129,7 +129,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info,
 }
 
 // https://dl.acm.org/doi/10.1145/7902.7903
-MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
+MGI_KERNEL(clauseOuts)(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
 {
     const m_uint current = MGI_GID_X + 2;
     const MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
@@ -151,7 +151,7 @@ MGI_KERNEL void clauseOuts(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolv
     }
 }
 
-MGI_KERNEL void debugReset(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
+MGI_KERNEL(debugReset)(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
 
 // Merge for resolve
 MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 

@@ -1,8 +1,18 @@
 #ifndef _MGI_SHARED
 #define _MGI_SHARED
 
+#ifdef MGI_API_OCL
 typedef unsigned int m_uint;
-typedef unsigned long long m_ulong;
+//typedef unsigned long long m_ulong;
+typedef uint2 m_uint2;
+#elif defined(MGI_API_VULKAN)
+#define m_uint uint
+// #define m_ulong unsigned long long
+#define m_uint2 uvec2
+#else
+typedef unsigned int m_uint;
+// typedef unsigned long long m_ulong; Extension defined
+#endif
 
 #ifdef __cplusplus
 #include <atomic>
@@ -43,10 +53,27 @@ extern "C" {
 
     #define MGI_UNROLL_HINT(hint) __attribute__((opencl_unroll_hint(hint)))
 
-    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; struct __##name
+    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; typedef name* name##_p;  struct __##name
+    #elif defined(MGI_API_VULKAN)
+    #define -> .
+    #define MGI_STRUCT(name) struct name 
+
+    #define MGI_GLOBAL  
+    #define MGI_IN 
+    #define MGI_SHARED  
+    #define MGI_CONST const
+    #define MGI_LOCAL
+        
+    #define MGI_UNROLL_HINT(hint)
+
+    #define MGI_BARRIER(flags)
+    #define MGI_MEM_GLOBAL 1
+    #define MGI_MEM_LOCAL 2
+    #define MGI_MEM_IMAGE 4
+
     #else
 
-    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; struct __##name
+    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; typedef name* name##_p; struct __##name
 
     #define MGI_GLOBAL  
     #define MGI_IN 
@@ -62,28 +89,30 @@ extern "C" {
     #define MGI_MEM_IMAGE 4
     #endif
 
-typedef uint2 m_uint2;
-
-typedef struct __mgi_rng {
+MGI_STRUCT(MGIRng) {
     m_uint2 seed;
-} MGIRng;
+};
 
 MGI_K_INLINE float mgiUintToFloat(m_uint x) {
+#ifdef MGI_API_VULKAN
+    return uintBitsToFloat(0x3f800000 | (x >> 9)) - 1.f;
+#else
     union {
         unsigned int a;
         float b;
     } u;
     u.a = 0x3f800000 | (x >> 9);
     return u.b - 1.f;
+#endif
 }
 
-MGI_K_INLINE void mgiRNGInit(MGI_LOCAL MGIRng* rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
+MGI_K_INLINE void mgiRNGInit(MGI_LOCAL MGIRng_p rng, m_uint x, m_uint y, m_uint id, m_uint seedVal) {
     rng->seed.x = x ^ (id << 16);
     rng->seed.y = y ^ ((id + seedVal) << 16);
 }
 
 // returns random float between (0,1]
-MGI_K_INLINE float mgiRNGRndFloat(MGI_LOCAL MGIRng* rng) {
+MGI_K_INLINE float mgiRNGRndFloat(MGI_LOCAL MGIRng_p rng) {
     // PCG2D, as described here: https://jcgt.org/published/0009/03/02/
     rng->seed = 1664525u * rng->seed + 1013904223u;
     rng->seed.x += 1664525u * rng->seed.y;

@@ -1,10 +1,12 @@
 #include "MGIKernelDefs.hpp"
 
-#ifndef MGI_API_OCL
-#error "OCL NOT DEFINED THIS SHOULD NOT BE THE CASE"
+#ifdef MGI_API_OCL
+#elif defined(MGI_API_VULKAN)
+#else
+#error "NO VALID API DEFINED THIS SHOULD NOT BE THE CASE"
 #endif
 
-MGI_KERNEL void test(MGI_GLOBAL int* n)
+MGI_KERNEL(test) (MGI_GLOBAL int* n)
 {
     int gid = MGI_GID;
     n[gid] *= 2;
