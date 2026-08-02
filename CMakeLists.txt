@@ -202,65 +202,93 @@ publish_app_registry_changes()
 if(${MALLOB_USE_GPU})
 message("GPU Support enabled")
 
+file(GLOB kernelfiles "src/mgi_kernel/*.*")
+
 include(FetchContent)
-
-set(OPENCL_SDK_BUILD_SAMPLES false)
-FetchContent_Declare(
-  openclsdk
-  GIT_REPOSITORY         https://github.com/KhronosGroup/OpenCL-SDK
-  GIT_TAG                v2025.07.23
-  GIT_SUBMODULES_RECURSE true
-  GIT_SHALLOW            true
-)
-FetchContent_MakeAvailable(openclsdk)
-
-if(${MALLOB_MGI_OCL_LAYERS})
-    FetchContent_Declare(rapidxml
-      GIT_REPOSITORY         https://github.com/discord/rapidxml
-      GIT_SUBMODULES_RECURSE true
-      GIT_SHALLOW            true
-    )
-    # Switch to own fork to fix issues :(
+if(NOT DEFINED MALLOB_GPU_API OR ${MALLOB_GPU_API} STREQUAL "OPENCL")
+    message("Using OpenCL as GPU API")
+    set(OPENCL_SDK_BUILD_SAMPLES false)
     FetchContent_Declare(
-      ocllayers
-      GIT_REPOSITORY         https://github.com/MrTroble/OpenCL-Layers
-      GIT_TAG                main
+      openclsdk
+      GIT_REPOSITORY         https://github.com/KhronosGroup/OpenCL-SDK
+      GIT_TAG                v2025.07.23
       GIT_SUBMODULES_RECURSE true
       GIT_SHALLOW            true
     )
+    FetchContent_MakeAvailable(openclsdk)
 
-    set(LAYERS_BUILD_TESTS true)
-    FetchContent_MakeAvailable(rapidxml)
-    set(RapidXml_DIR ${rapidxml_SOURCE_DIR})
-    FetchContent_MakeAvailable(ocllayers)
-    
-    # Work around for non conformant C code in header 
-    # See for reference https://github.com/fmtlib/fmt/issues/2059
-    # And `__STRICT_ANSI__` in https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        target_compile_options(LayersCommon INTERFACE -std=gnu++17)
+    if(${MALLOB_MGI_OCL_LAYERS})
+        FetchContent_Declare(rapidxml
+          GIT_REPOSITORY         https://github.com/discord/rapidxml
+          GIT_SUBMODULES_RECURSE true
+          GIT_SHALLOW            true
+        )
+        # Switch to own fork to fix issues :(
+        FetchContent_Declare(
+          ocllayers
+          GIT_REPOSITORY         https://github.com/MrTroble/OpenCL-Layers
+          GIT_TAG                main
+          GIT_SUBMODULES_RECURSE true
+          GIT_SHALLOW            true
+        )
+
+        set(LAYERS_BUILD_TESTS true)
+        FetchContent_MakeAvailable(rapidxml)
+        set(RapidXml_DIR ${rapidxml_SOURCE_DIR})
+        FetchContent_MakeAvailable(ocllayers)
+
+        # Work around for non conformant C code in header 
+        # See for reference https://github.com/fmtlib/fmt/issues/2059
+        # And `__STRICT_ANSI__` in https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(LayersCommon INTERFACE -std=gnu++17)
+        endif()
+
     endif()
 
+    set(BASE_LIBS ${BASE_LIBS}
+            OpenCL::Headers
+            OpenCL::HeadersCpp
+            OpenCL::OpenCL
+            OpenCL::Utils
+            OpenCL::UtilsCpp)
+
+    set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP/include
+                                 ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
+    add_definitions(-DMGI_API_OCL=1)
+elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
+    message("Using Vulkan as GPU API")
+    FetchContent_Declare(
+      vulkan_sdk
+      URL https://sdk.lunarg.com/sdk/download/1.4.357.0/linux/vulkansdk-linux-x86_64-1.4.357.0.tar.xz
+      URL_HASH SHA256=0f09bf6a0625e346bf004be70b92907e934a4c76606b323441b2baf3a5a0e66d
+    )
+    FetchContent_MakeAvailable(vulkan_sdk)
+
+    set(ENV{VULKAN_SDK} "${vulkan_sdk_SOURCE_DIR}/x86_64")
+    # TODO use find package find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
+    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} $ENV{VULKAN_SDK}/lib)
+    set(BASE_LIBS ${BASE_LIBS} libvulkan)
+    set(BASE_INCLUDES ${BASE_INCLUDES} $ENV{VULKAN_SDK}/include)
+
+    add_definitions(-DMGI_API_VULKAN=1)
+
+    #vulkan compiles
+    foreach(file ${kernelfiles})
+        cmake_path(GET file FILENAME filename)
+        add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" 
+        COMMAND $ENV{VULKAN_SDK}/bin/glslc -std=460core --target-env=vulkan1.3 "-fshader-stage=comp" -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-DMGI_API_VULKAN=1" 
+        "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv"
+        MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
+        list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
+    endforeach()
 endif()
 
-set(BASE_LIBS ${BASE_LIBS}
-        OpenCL::Headers
-        OpenCL::HeadersCpp
-        OpenCL::OpenCL
-        OpenCL::Utils
-        OpenCL::UtilsCpp)
-        
-set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP/include
-                             ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
-
-# Currently default to OpenCL
-add_definitions(-DMGI_API_OCL_HOST=1 -DMALLOB_USE_GPU=1)
+add_definitions(-DMALLOB_USE_GPU=1)
 
 set(MALLOB_CORE_SOURCES
     ${MALLOB_CORE_SOURCES}
     "src/mgi/KernelLoader.cpp" "src/mgi/DeferredAPI.cpp")
-
-file(GLOB kernelfiles "src/mgi_kernel/*.*")
 
 if(NOT DEFINED MALLOB_MGI_TEST_COMPILE)
 set(MALLOB_MGI_TEST_COMPILE Off)
@@ -270,6 +298,7 @@ endif()
 if(${MALLOB_MGI_TEST_COMPILE})
 foreach(file ${kernelfiles})
   cmake_path(GET file FILENAME filename)
+  # OCL Compiler
   add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" COMMAND clang "-cl-std=cl3.0" "-I" "${CMAKE_BINARY_DIR}/mgi_kernel" "--target=spirv64" "-DMGI_API_OCL=1" "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
   add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}" 
                      COMMAND ${CMAKE_COMMAND} -E copy
