@@ -264,23 +264,43 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
       URL_HASH SHA256=0f09bf6a0625e346bf004be70b92907e934a4c76606b323441b2baf3a5a0e66d
     )
     FetchContent_MakeAvailable(vulkan_sdk)
-
     set(ENV{VULKAN_SDK} "${vulkan_sdk_SOURCE_DIR}/x86_64")
+    set(ENV{PATH} "$ENV{PATH}:$ENV{VULKAN_SDK}/bin")
+    set(ENV{LD_LIBRARY_PATH} "$ENV{VULKAN_SDK}/lib")
+    set(ENV{VK_LAYER_PATH} "$ENV{VULKAN_SDK}/share/vulkan/explicit_layer.d")
+    set(ENV{VK_ADD_LAYER_PATH} "$ENV{VULKAN_SDK}/share/vulkan/explicit_layer.d")
+    set(ENV{PKG_CONFIG_PATH} "$ENV{VULKAN_SDK}/lib/pkgconfig/")
+    set(ENV{CMAKE_PREFIX_PATH} "$ENV{VULKAN_SDK}:$ENV{VULKAN_SDK}/lib/VulkanLoader")
+
     # TODO use find package find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
     set(BASE_LINK_DIRS ${BASE_LINK_DIRS} $ENV{VULKAN_SDK}/lib)
     set(BASE_LIBS ${BASE_LIBS} libvulkan)
     set(BASE_INCLUDES ${BASE_INCLUDES} $ENV{VULKAN_SDK}/include)
+
+    find_package(Python)
+
+    FetchContent_Declare(
+        clspv
+        GIT_REPOSITORY https://github.com/google/clspv
+        GIT_TAG main
+        GIT_SUBMODULES_RECURSE true
+        GIT_SHALLOW            true
+        UPDATE_COMMAND         ${Python_EXECUTABLE} utils/fetch_sources.py
+    )
+    FetchContent_MakeAvailable(clspv)
 
     add_definitions(-DMGI_API_VULKAN=1)
 
     #vulkan compiles
     foreach(file ${kernelfiles})
         cmake_path(GET file FILENAME filename)
-        add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv" 
+        if(${filename} MATCHES ".*\\.cpp$")
+        add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv" 
         COMMAND $ENV{VULKAN_SDK}/bin/glslc -std=460core --target-env=vulkan1.3 "-fshader-stage=comp" -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-DMGI_API_VULKAN=1" 
-        "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv"
+        "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv"
         MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
-        list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}.spv")
+        list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv")
+        endif()
     endforeach()
 endif()
 
