@@ -89,7 +89,7 @@ void ForkedSatJob::doStartSolver() {
 
     // Forward original problem clauses to GPU Clause interface
     assert(!desc.isRevisionIncomplete(0)); // TODO catch / (how to?) handle
-    _gpu_clauses.insertOriginalClauses({desc.getFormulaPayload(0), desc.getFormulaPayloadSize(0)});
+    _gpu_clauses.insertOriginalClauses(desc.getFormulaPayload(0), desc.getFormulaPayloadSize(0));
 
     loadIncrements();
 

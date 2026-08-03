@@ -341,6 +341,19 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
         }
     );
 
+    if (_gpu_clauses) {
+        LOG(V2_INFO, "[GPU] connecting GPU interface to sharing session\n");
+        // connect output of GPU clause interface to local input of clause sharing
+        _current_session->setGpuClauseSource(_gpu_clauses);
+        // connect output of clause sharing to input of GPU clause interface
+        _current_session->setAdditionalClauseListener(
+            [&, session = _current_session.get()](std::vector<int>& clauses) {
+                auto reader = session->getBufferReader(clauses.data(), clauses.size());
+                _gpu_clauses->insertClausesFromSharing(reader);
+            }
+        );
+    }
+
     // advance broadcast of initiation message
     msg.contextIdOfSender = snapshot.contextId;
     msg.treeIndexOfSender = snapshot.index;
