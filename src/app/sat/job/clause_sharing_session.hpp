@@ -3,6 +3,7 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/clause_sharing_actor.hpp"
+#include "app/sat/job/gpu_clause_interface.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
@@ -48,6 +49,9 @@ private:
 
     bool _has_clause_listener {false};
     std::function<void(std::vector<int>&)> _clause_listener;
+
+    bool _has_gpu_source {false};
+    GpuClauseInterface* _gpu_clause_source;
 
     std::unique_ptr<StaticClauseStore<false>> _merge_store;
     bool _priority_based_buffer_merging = false;
@@ -95,6 +99,10 @@ public:
     void setAdditionalClauseListener(std::function<void(std::vector<int>&)> cb) {
         _has_clause_listener = true;
         _clause_listener = cb;
+    }
+    void setGpuClauseSource(GpuClauseInterface* gpuClauseSource) {
+        _gpu_clause_source = gpuClauseSource;
+        _has_gpu_source = true;
     }
 
     void advanceSharing() {
@@ -233,6 +241,10 @@ public:
         return _best_found_solution_cost;
     }
 
+    BufferReader getBufferReader(int* data, size_t buflen) const {
+        return _merge_store->getBufferReader(data, buflen);
+    }
+
     ~ClauseSharingSession() {
         LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
@@ -287,11 +299,19 @@ private:
             for (auto& elem : elems) {
                 merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
             }
+            if (_has_gpu_source) {
+                auto gpuClauses = _gpu_clause_source->retrieveClauseBufferToShare(buflim);
+                merger.add(_merge_store->getBufferReader(gpuClauses.data(), gpuClauses.size()));
+            }
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
             auto merger = BufferMerger(buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
                 merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
+            }
+            if (_has_gpu_source) {
+                auto gpuClauses = _gpu_clause_source->retrieveClauseBufferToShare(buflim);
+                merger.add(_merge_store->getBufferReader(gpuClauses.data(), gpuClauses.size()));
             }
             merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }

@@ -5,11 +5,13 @@
 #include <limits>
 #include <vector>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
 #include "mgi/DeferredAPI.hpp"
 #include "mgi/MGIHelper.hpp"
 #include "mgi_kernel/MGIShared.hpp"
+#include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/data/environmental_clause_store.hpp"
 
@@ -210,22 +212,41 @@ public:
     }
 
     // Called from MPI (sharing) side
-    void insertOriginalClauses(mgi::span<const int> values)
+    void insertOriginalClauses(const int* begin, size_t size)
     {
-        insertClausesFromSharing(values); // TODO(Dominik) any special treatment needed?
+        insertClausesFromSharing(begin, size);
+    }
+
+    // Called from MPI (sharing) side; variant for sharing buffer
+    void insertClausesFromSharing(BufferReader& reader)
+    {
+        size_t nbAdded = 0;
+
+        while (true) {
+            Mallob::Clause clause = reader.getNextIncomingClause();
+            if (!clause.begin) break;
+            insertClausesFromSharing(
+                clause.begin + ClauseMetadata::numInts(),
+                clause.size - ClauseMetadata::numInts()
+            );
+            nbAdded++;
+        }
+
+        LOG(V2_INFO, "[GPU] pre-buf received %lu clauses from sharing for GPU\n", nbAdded);
+    }
+    // Called from MPI (sharing) side; variant for plain list of zero-terminated clauses
+    void insertClausesFromSharing(const int* begin, size_t size)
+    {
+        _pre_buffer.insert(begin, begin+size);
     }
 
     // Called from MPI (sharing) side
-    void insertClausesFromSharing(mgi::span<const int> values)
-    {
-        _pre_buffer.insert(values.begin(), values.end());
-    }
-
-    // Called from MPI (sharing) side
-    std::vector<int> retrieveClausesToShare(int limit)
+    std::vector<int> retrieveClauseBufferToShare(int limit)
     {
         int nbExportedClauses, nbExportedLits;
-        return _post_buffer.exportBuffer(limit, nbExportedClauses, nbExportedLits);
+        auto result = _post_buffer.exportBuffer(limit, nbExportedClauses, nbExportedLits);
+        LOG(V2_INFO, "[GPU] post-buf yielded %lu clauses from GPU for sharing\n", nbExportedClauses);
+        return result;
     }
 
 private:

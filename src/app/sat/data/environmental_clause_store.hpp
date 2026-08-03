@@ -50,6 +50,11 @@ public:
         selectedClauses.clear();
         selectedVolume = 0;
 
+        if (nbVars == 0) {
+            LOG(V1_WARN, "[WARN] no clauses in store for GPU!\n");
+            return output;
+        }
+
         while (selectedVolume < 0.9 * maxLits && nbTries > 0) {
             int var = (int) std::round(rng.randomInRange(1, nbVars));
             addEnvironment(var, maxLits - selectedVolume);
