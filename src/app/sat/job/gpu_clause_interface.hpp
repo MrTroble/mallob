@@ -322,7 +322,11 @@ public:
         this->_verify_gpu_resolvents = params.verifyGPUResolvents();
         if (useBackgroundThreads)
             launchBackgroundThreads();
+<<<<<<< HEAD
         LOG(V3_VERB, "Finished loading GPUClauseInterface\n");
+=======
+        LOG(V3_VERB, "Finished loading GPUClauseInterface");
+>>>>>>> bd94e5a3 (fix: setup issues with paths)
     }
     ~GpuClauseInterface()
     {
