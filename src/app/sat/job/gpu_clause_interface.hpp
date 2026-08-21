@@ -44,6 +44,7 @@ private:
     // Function called from within (?)
     inline void pushClausesToGpu(mgi::span<const int> values)
     {
+        sleep(20);
         // TODO add compression stages and use the correct kernel
         using namespace mgi;
 
@@ -78,6 +79,11 @@ private:
         {
             clauseAmount--; // We have a trailing zero;
         }
+        if(clauseAmount == 0) {
+            LOG(V1_WARN, "No resolvents submitted to gpu!\n");
+            return;
+        }
+        assert(clauseAmount != SIZE_MAX);
 
         prefixes.push_back(pagesLoaded.size()); // ADD CURRENT PAGE ID AT THE END
         // We need n^2 / 2 to compare each to each
@@ -195,6 +201,7 @@ public:
         this->useBackgroundThreads = useBackgroundThreads;
         if (useBackgroundThreads)
             launchBackgroundThreads();
+        LOG(V3_VERB, "Finished loading GPUClauseInterface");
     }
     ~GpuClauseInterface()
     {

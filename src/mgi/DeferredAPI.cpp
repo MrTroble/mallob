@@ -9,7 +9,8 @@ namespace mgi
     {
         std::vector<AllocationSlab> sizeValues(infos.size());
         std::transform(infos.begin(), infos.end(), sizeValues.begin(), [](const auto &value)
-                       { return AllocationSlab{value.size, value.type}; });
+                       { assert(value.size && "Allocation must be bigger then zero"); 
+                         return AllocationSlab{value.size, value.type}; });
         return sizeValues;
     }
 
