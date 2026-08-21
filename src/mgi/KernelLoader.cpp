@@ -12,16 +12,16 @@ namespace mgi
     Kernel KernelLoaderOCL::loadKernel(OCLDeferredAPI *api, const std::string &file)
     {
         // TODO Auto package binaries
-        const auto source = mgi::wholeFile<std::string>(file);
+        const auto source = mgi::wholeFile<std::string>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file);
         if (source.empty())
             return {};
         cl::Program program(api->init.context, source);
 
         // TODO Dynamic!!!
-        const auto kernelDefs = mgi::wholeFile<std::string>("mgi_kernel/MGIKernelDefs.hpp");
+        const auto kernelDefs = mgi::wholeFile<std::string>(MALLOB_SUBPROC_DISPATCH_PATH "/mgi_kernel/MGIKernelDefs.hpp");
         cl::Program kernelDefsProgram(api->init.context, kernelDefs);
 
-        const auto kernelShared = mgi::wholeFile<std::string>("mgi_kernel/MGIShared.hpp");
+        const auto kernelShared = mgi::wholeFile<std::string>(MALLOB_SUBPROC_DISPATCH_PATH "/mgi_kernel/MGIShared.hpp");
         cl::Program kernelSharedProgram(api->init.context, kernelShared);
 
         std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram, kernelShared};
