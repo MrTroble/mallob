@@ -41,7 +41,6 @@
       "inherits": "linux-debug-wsl",
       "cacheVariables": { "MALLOB_USE_GPU": true,
             "MALLOB_GPU_API": "VULKAN",
-            "MALLOB_SUBPROC_DISPATCH_PATH": "\"build/\"",
             "MALLOB_MGI_OCL_LAYERS": true,
             "MALLOB_USE_ASAN": false}
     },
