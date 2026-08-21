@@ -44,7 +44,7 @@ private:
     // Function called from within (?)
     inline void pushClausesToGpu(mgi::span<const int> values)
     {
-        sleep(20);
+        LOG(V3_VERB, "Start push to GPU\n");
         // TODO add compression stages and use the correct kernel
         using namespace mgi;
 
@@ -132,6 +132,10 @@ private:
     inline std::vector<int> pullResolveFromGPU()
     {
         using namespace mgi;
+        if(!lastTask) {
+            LOG(V1_WARN, "No resolvent task was started, therefore could not pull from GPU!\n");
+            return {};
+        }
         _mgi_api.waitTasks(from(lastTask));
         for (const auto t : tasksToRetire)
             _mgi_api.freeObj(t);
@@ -196,12 +200,13 @@ public:
                                                                                                                _post_buffer(params, false, 256, true, 1 << 20)
     {
         using namespace mgi;
+        WAIT_FOR_DEBUGGER;
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
         mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Global, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
         if (useBackgroundThreads)
             launchBackgroundThreads();
-        LOG(V3_VERB, "Finished loading GPUClauseInterface");
+        LOG(V3_VERB, "Finished loading GPUClauseInterface\n");
     }
     ~GpuClauseInterface()
     {
