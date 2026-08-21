@@ -5,6 +5,8 @@
 #include <CL/opencl.hpp>
 #endif
 
+volatile int gdb_attached = 0;
+
 namespace mgi
 {
 
