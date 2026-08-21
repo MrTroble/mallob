@@ -200,7 +200,7 @@ public:
                                                                                                                _post_buffer(params, false, 256, true, 1 << 20)
     {
         using namespace mgi;
-        WAIT_FOR_DEBUGGER;
+
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
         mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Global, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
