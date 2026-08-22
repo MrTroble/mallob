@@ -1,5 +1,5 @@
-#ifndef _MGI_SHARED
-#define _MGI_SHARED
+#ifndef MGI_SHARED_HPP
+#define MGI_SHARED_HPP
 
 #ifdef MGI_API_OCL
 typedef unsigned int m_uint;
@@ -32,6 +32,7 @@ extern "C" {
     inline uint2 operator*(m_uint l, uint2 o) { return { o.x*l, o.y*l}; }
 
     typedef std::atomic<float> atomic_float;
+    typedef std::atomic<int> atomic_int;
 
     #define MGI_K_INLINE inline
 
@@ -53,9 +54,8 @@ extern "C" {
 
     #define MGI_UNROLL_HINT(hint) __attribute__((opencl_unroll_hint(hint)))
 
-    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; typedef name* name##_p;  struct __##name
+    #define MGI_STRUCT(name) struct mig__##name; typedef struct mig__##name name; typedef name* name##_p;  struct mig__##name
     #elif defined(MGI_API_VULKAN)
-    #define -> .
     #define MGI_STRUCT(name) struct name 
 
     #define MGI_GLOBAL  
@@ -149,7 +149,7 @@ MGI_STRUCT(MGIDebugHelper) {
     char messageBuffer[MGI_MAX_DEBUG_MESSAGE_SPACE];
     m_uint lastIndex;
     m_uint overflowMessageCount;
-    atomic_flag flag;
+    atomic_int flag;
 };
 
 MGI_STRUCT(MGIInfo) {
@@ -158,7 +158,9 @@ MGI_STRUCT(MGIInfo) {
 };
 
 MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST char* message) {
-    while(!atomic_flag_test_and_set(&helper->flag));
+    int value = 0;
+    while(atomic_compare_exchange_strong(&helper->flag, &value, 1))
+        value = atomic_load(&helper->flag);
     while (*message != 0 && helper->lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
     {
         if(helper->lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
@@ -174,11 +176,11 @@ MGI_K_INLINE void __internal_print(MGI_GLOBAL MGIDebugHelper* helper, MGI_CONST 
     if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
         helper->messageBuffer[helper->lastIndex] = 0;
     }
-    atomic_flag_clear(&helper->flag);
+    atomic_store(&helper->flag, 0);
 }
 
 MGI_K_INLINE void __internal_print_generic(MGI_GLOBAL MGIDebugHelper* helper, char* message) {
-    while(!atomic_flag_test_and_set(&helper->flag));
+   // while(!atomic_flag_test_and_set(&helper->flag));
     while (*message != 0 && helper->lastIndex < MGI_MAX_DEBUG_MESSAGE_SPACE)
     {
         if(helper->lastIndex >= MGI_MAX_DEBUG_MESSAGE_SPACE) {
@@ -194,13 +196,13 @@ MGI_K_INLINE void __internal_print_generic(MGI_GLOBAL MGIDebugHelper* helper, ch
     if(helper->lastIndex <= MGI_MAX_DEBUG_MESSAGE_SPACE) {
         helper->messageBuffer[helper->lastIndex] = 0;
     }
-    atomic_flag_clear(&helper->flag);
+    //atomic_flag_clear(&helper->flag);
 }
 
 #define MGI_DEBUG_LOG(message) __internal_print(&info->__pDebugHelper, (MGI_CONST char*)(message))
 #define MGI_DEBUG_LOGG(message) __internal_print_generic(&info->__pDebugHelper, message)
 
-static char TRANS_NUMBER[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+static MGI_CONST char TRANS_NUMBER[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
 MGI_K_INLINE void toString(char* ptr, m_uint number) {
     for(uint x = 0; x < 8; x++) {
@@ -227,7 +229,7 @@ MGI_K_INLINE void printNumbers(m_uint number[], m_uint count, MGI_GLOBAL MGIDebu
 
 MGI_K_INLINE void mgiAtomicReserviorAddSample(MGI_GLOBAL MGIAtomicReservoir* reservior, MGI_LOCAL MGIRng* rng, const MGIResolveInfo* resolve, float weight) {
     float value = atomic_load(&reservior->weight);
-    while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight) != value)
+    while(atomic_compare_exchange_strong(&reservior->weight, &value, value + weight))
         value = atomic_load(&reservior->weight);
     // Can we get rid of those compare exchanges
     // Does this kill the probabilty? Look at the Markov Chain: Ergodisity even needed?
