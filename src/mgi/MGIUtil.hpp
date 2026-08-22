@@ -49,7 +49,7 @@ namespace mgi
         T *beginPtr = nullptr;
         T *endPtr = nullptr;
 
-        MGISpan();
+        MGISpan() {}
 
         template <typename G>
         MGISpan(const G &holder) : beginPtr(holder.data()), endPtr(holder.data() + holder.size()) {}
