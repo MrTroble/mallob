@@ -76,6 +76,9 @@ inline bool doTerminate(Parameters& params, int rank) {
 
 void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params, DistributedTermination& distTerm) {
 
+    if(params.noNodeCrashing())
+        SysState_disableUnresponsiveNodeCrashing();
+
     // Determine which role(s) this PE has
     bool isWorker = commWorkers != MPI_COMM_NULL;
     bool isClient = commClients != MPI_COMM_NULL;
