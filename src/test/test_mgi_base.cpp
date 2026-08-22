@@ -22,6 +22,14 @@ public:
         interface.pushClausesToGpu(value);
     }
 
+    void preTests() {
+        const auto v = interface.fetchClausesFromGpu();
+        assert(v.empty());
+        interface.pushClausesToGpu(mgi::span<const int>{});
+        const auto v2 = interface.fetchClausesFromGpu();
+        assert(v2.empty());
+    }
+
     std::vector<int> testWaitForTasks()
     {
         auto status = interface._mgi_api.getStatus(from(interface.lastTask)).back();
@@ -163,6 +171,7 @@ void testRoutine()
 
     {
         InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
+        gpuInterface.preTests();
 
         // Test clauses: All positiv + All negativ
         const size_t elementsPerClaus = 16;
@@ -351,5 +360,5 @@ int main(int argc, char *argv[])
     test::testResolutionKernel();
     testRoutine();
 
-    MPI_Finalize();
+    // MPI_Finalize();
 }
