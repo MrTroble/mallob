@@ -1,7 +1,7 @@
 #include "MGIKernelDefs.hpp"
 #include "MGIShared.hpp"
 
-const m_uint MAX_SIZE_CACHED = 256;
+MGI_CONST m_uint MAX_SIZE_CACHED = 256;
 
 // TODO Redo with sorting
 bool checkIsInverseIn(int clause, MGI_IN int *literalsBegin, MGI_IN int *literalsEnd)

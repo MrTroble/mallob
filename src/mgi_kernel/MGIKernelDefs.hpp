@@ -1,5 +1,5 @@
-#ifndef _MGI_KERNEL_DEFS
-#define _MGI_KERNEL_DEFS
+#ifndef MGI_KERNEL_DEFS
+#define MGI_KERNEL_DEFS
 
 #ifdef MGI_API_OCL
 #define MGI_KERNEL(name) __kernel void name
@@ -75,4 +75,4 @@ static uint32_t __mgi__ySize = 1;
 
 #endif
 
-#endif //_MGI_KERNEL_DEFS
+#endif //MGI_KERNEL_DEFS

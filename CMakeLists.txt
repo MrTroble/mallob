@@ -281,11 +281,8 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
 
     FetchContent_Declare(
         clspv
-        GIT_REPOSITORY https://github.com/google/clspv
-        GIT_TAG main
-        GIT_SUBMODULES_RECURSE true
-        GIT_SHALLOW            true
-        UPDATE_COMMAND         ${Python_EXECUTABLE} utils/fetch_sources.py
+        URL https://github.com/MrTroble/clspv/releases/download/main-1.0/clspv.tar.xz
+        URL_HASH SHA256=2c563b94552f2cd0d7a8a32aed32ba61c302cf4ff19c6bedc10c8bb651ff108f
     )
     FetchContent_MakeAvailable(clspv)
 
@@ -297,7 +294,7 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
 
         if(${filename} MATCHES ".*\\.cpp$")
         add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv" 
-        COMMAND $ENV{VULKAN_SDK}/bin/glslc -std=460core --target-env=vulkan1.3 "-fshader-stage=comp" -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-DMGI_API_VULKAN=1" 
+        COMMAND ${clspv_SOURCE_DIR}/clspv --cl-std=CL2.0 -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-inline-entry-points" "-w" "-DMGI_API_OCL=1" "--arch=spirv64"
         "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv"
         MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
         list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv")
