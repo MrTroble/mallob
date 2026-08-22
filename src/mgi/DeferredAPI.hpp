@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include "comm/sysstate.hpp"
+#include <signal.h>
 #include "KernelLoader.hpp"
 #ifdef MGI_API_OCL_HOST
 #define CL_HPP_TARGET_OPENCL_VERSION 300
@@ -16,11 +17,17 @@
 
 extern volatile int gdb_attached;
 
+static void __implWaitForDebugger() {
+    SysState_disableUnresponsiveNodeCrashing(); \
+    LOG(V1_WARN, "%s, %d\n", SysState_isUnresponsiveNodeCrashingEnabled() ? "true":"false", MyMpi::rank(MPI_COMM_WORLD));\
+    LOG(V1_WARN, "DEBUGGER MODE: Disabled unresponsivnes check\n"); \
+    while(gdb_attached == 0) {
+        std::this_thread::sleep_for(std::chrono::seconds(1)); 
+    }
+}
+
 #ifdef DEBUG
-#define WAIT_FOR_DEBUGGER  SysState_disableUnresponsiveNodeCrashing(); \
-     LOG(V1_WARN, "%s, %d\n", SysState_isUnresponsiveNodeCrashingEnabled() ? "true":"false", MyMpi::rank(MPI_COMM_WORLD));\
-     LOG(V1_WARN, "DEBUGGER MODE: Disabled unresponsivnes check\n"); \
-    while(gdb_attached == 0) std::this_thread::sleep_for(std::chrono::seconds(1)); 
+#define WAIT_FOR_DEBUGGER  __implWaitForDebugger();
 #else
 #define WAIT_FOR_DEBUGGER
 #endif
