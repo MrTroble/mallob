@@ -191,10 +191,8 @@ void testRoutine()
         gpuInterface.print();
 
         const auto reservoirsLast = gpuInterface.testAfterPush(2);
-        assert(reservoirsLast[0].resolve.clauseOne == 0);
-        assert(reservoirsLast[0].resolve.clauseTwo == 1);
-        assert(reservoirsLast[0].resolve.literal == 1);
-        assert(reservoirsLast[0].resolve.resolvedSize == 0);
+        assert(reservoirsLast[0].resolve.literal == 0);
+        // Tautology should not be added to reservoir
     }
     {
         InterfaceTestGpuClause gpuInterface{GpuClauseInterface{deferred, Parameters(), false}};
@@ -275,10 +273,8 @@ namespace test
         {
             MGIReservoir reservoir;
             findResolventsReservoir(&mgiInfo, clauses.data(), beginings.data(), &reservoir);
-            assert(reservoir.resolve.literal == 1);
-            assert(reservoir.resolve.clauseOne == 0);
-            assert(reservoir.resolve.clauseTwo == 1);
-            assert(reservoir.resolve.resolvedSize == 0);
+            assert(reservoir.resolve.literal == 0);
+            // Tautology should not be added to reservoir
         }
 
         {
