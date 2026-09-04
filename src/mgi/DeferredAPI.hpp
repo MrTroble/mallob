@@ -711,7 +711,6 @@ namespace mgi
                              "Could not enqueue kernel %s", task.function.c_str());
                 index++;
             }
-            MGI_DB_CHECK(clFlush(queue), "Could not flush!");
             return returnTasks;
         }
         
