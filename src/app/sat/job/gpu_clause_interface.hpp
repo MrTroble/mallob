@@ -111,14 +111,13 @@ private:
             lastClauseAmount = clauseAmount;
         }
         _mgi_api.writeMemory(mgiInfo, from(BufferUpdateInfo::from(from(maxSize))));
-        memories.insert(memories.begin(), mgiInfo);
-        memories.push_back(currentReservoir);
+        std::vector<mgi::Memory> descriptors = { mgiInfo, memories[0], memories[1], currentReservoir };
         // TODO Reuse allocation
 
         TaskInfo taskInfo{{}, TaskType::Long, {clauseAmount, sizeOfY, 1}};
         taskInfo.kernel = this->resolutionKernel;
         taskInfo.function = "findResolventsReservoir";
-        taskInfo.descriptor.memory = memories;
+        taskInfo.descriptor.memory = descriptors;
         taskInfo.groupSizes[0] = std::min(clauseAmount, (size_t)4);
         taskInfo.groupSizes[1] = std::min(sizeOfY, (size_t)4);
         if (lastTask)
