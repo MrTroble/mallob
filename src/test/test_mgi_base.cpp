@@ -19,10 +19,16 @@ public:
 
     void testGpuPush(mgi::span<const int> value)
     {
+        if (!interface._verify_gpu_resolvents)
+        {
+            LOG(V2_INFO, "Force on gpu resolvent verification!\n");
+            interface._verify_gpu_resolvents = true;
+        }
         interface.pushClausesToGpu(value);
     }
 
-    void preTests() {
+    void preTests()
+    {
         const auto v = interface.fetchClausesFromGpu();
         assert(v.empty());
         interface.pushClausesToGpu(mgi::span<const int>{});
