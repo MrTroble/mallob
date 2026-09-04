@@ -38,6 +38,8 @@ private:
     mgi::Memory outputResolve;
     std::vector<std::vector<mgi::Memory>> pagesLoaded;
 
+    bool _verify_gpu_resolvents = false;
+
     const int pageSize{65536};
 
     // TODO getLoad() function or sth similar?
@@ -180,6 +182,47 @@ private:
         _mgi_api.queueWaitTasks(tasks);
         printDebugOutput(_mgi_api, resolutionKernel, mgiInfo);
 
+        ReadInfo readInfo{output.size};
+        ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
+        const auto start = (int *)lock.ptr[0];
+        std::vector<int> result(start, start + sizeRead);
+
+        if(_verify_gpu_resolvents && !result.empty()) {
+            LOG(V1_WARN, "Verifying GPU resolvents, this might be slow!\n");
+            ReadInfo readSize{lastClauseAmount * sizeof(MGIReservoir)};
+            ReadLock lock = _mgi_api.readMemory(currentReservoir, from(readSize));
+            auto reservoirsCurrent = ((MGIReservoir *)lock.ptr[0]);
+            
+            auto startPtr = result.begin();
+            uint32_t clauseIdx = 0;
+            uint32_t emptyClauseCount = 0;
+            for(size_t i = 0; i < result.size(); i++) {
+                if(result[i] == 0) {
+                    const auto endPtr = result.begin() + i;
+                    auto clauseSize = std::distance(startPtr, endPtr);
+                    if(clauseSize <= 0) {
+                        LOG(V0_CRIT, "Produced empty clause %lu!\n", clauseIdx);
+                        assert(false);
+                    }
+                    auto& reservoir = reservoirsCurrent[clauseIdx];
+                    while(reservoir.weight == 0.0f || reservoir.resolve.literal == 0) {
+                        if(clauseIdx >= lastClauseAmount) {
+                            LOG(V0_CRIT, "Not enough full reservoirs with %lu empty from %lu!\n", emptyClauseCount, lastClauseAmount);
+                            assert(false);
+                        }
+                        reservoir = reservoirsCurrent[++clauseIdx];
+                        emptyClauseCount++;
+                    }
+                    if(reservoir.resolve.resolvedSize != clauseSize) {
+                        LOG(V0_CRIT, "Produced %lu clause of size %lu but reservoir expected %u!\n", clauseIdx, clauseSize, reservoir.resolve.resolvedSize);
+                        assert(false);
+                    }
+                    startPtr = endPtr + 1;
+                    clauseIdx++;
+                }
+            }
+        }
+
         for (const auto &page : pagesLoaded)
         {
             for (const auto m : page)
@@ -187,10 +230,7 @@ private:
         }
         pagesLoaded.clear();
 
-        ReadInfo readInfo{output.size};
-        ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
-        const auto start = (int *)lock.ptr[0];
-        return std::vector(start, start + sizeRead);
+        return result;
     }
 
     bool useBackgroundThreads = true;
@@ -204,6 +244,7 @@ public:
         resolutionKernel = mgiApi.loadKernel("mgi_kernel/resolution_kernel.cpp");
         mgiInfo = mgiApi.allocate(from(AllocationInfo::from(MemoryType::Global, sizeof(MGIInfo)))).back();
         this->useBackgroundThreads = useBackgroundThreads;
+        this->_verify_gpu_resolvents = params.verifyGPUResolvents();
         if (useBackgroundThreads)
             launchBackgroundThreads();
         LOG(V3_VERB, "Finished loading GPUClauseInterface\n");
