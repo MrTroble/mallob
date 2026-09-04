@@ -89,6 +89,8 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
             resolve.clauseTwo = index;
             resolve.resolvedSize = 0;
             
+            bool foundTautologie = 0;
+
             MGI_UNROLL_HINT(1)
             while(otherBegin < otherEnd && iter < currentEnd)
             {
@@ -98,6 +100,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
                 const int l1A = abs(l1);
                 const int l2A = abs(l2);
 
+                foundTautologie |= (l1 == -l2 && resolve.literal != 0);
                 resolve.literal += ((l1 == -l2 && resolve.literal == 0) ? l1A : 0);
                 resolve.resolvedSize += (l1 != -l2 ? 1:0);
                 const uint equal = l1A == l2A ? 1:0;
@@ -113,7 +116,7 @@ MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, MGI_IN int *cl
             {
                 resolve.resolvedSize += currentEnd - iter;
             }
-            float weight = (resolve.literal == 0 ? 0 : 1) * (1.0f / ((float)MGI_GSIZE_Y)) * (1 - (resolve.resolvedSize / maxValue));
+            float weight = (foundTautologie ? 0 : 1) * (1.0f / ((float)MGI_GSIZE_Y)) * (1 - (resolve.resolvedSize / maxValue));
             mgiReserviorAddSample(&currentReservoir, &rng, &resolve, weight);
         }
     }
