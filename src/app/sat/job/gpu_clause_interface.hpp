@@ -81,7 +81,8 @@ private:
         {
             clauseAmount--; // We have a trailing zero;
         }
-        if(clauseAmount == 0) {
+        if (clauseAmount == 0)
+        {
             LOG(V1_WARN, "No resolvents submitted to gpu!\n");
             return;
         }
@@ -102,7 +103,8 @@ private:
             const std::array realloc = {AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
                                         AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
             const auto reservoirMemory = _mgi_api.allocate(realloc);
-            if (currentReservoir) {
+            if (currentReservoir)
+            {
                 _mgi_api.copyMemoryWait(currentReservoir, reservoirMemory[0], from(MemoryCopyInfo{lastClauseAmount * sizeof(MGIReservoir)}));
                 _mgi_api.freeObj(currentReservoir);
             }
@@ -113,7 +115,7 @@ private:
             lastClauseAmount = clauseAmount;
         }
         _mgi_api.writeMemory(mgiInfo, from(BufferUpdateInfo::from(from(maxSize))));
-        std::vector<mgi::Memory> descriptors = { mgiInfo, memories[0], memories[1], currentReservoir };
+        std::vector<mgi::Memory> descriptors = {mgiInfo, memories[0], memories[1], currentReservoir};
         // TODO Reuse allocation
 
         TaskInfo taskInfo{{}, TaskType::Long, {clauseAmount, sizeOfY, 1}};
@@ -130,10 +132,104 @@ private:
         lastTask = _mgi_api.queueTasks(from(taskInfo)).back();
     }
 
+    inline void verifyGPUResolvents(const std::vector<int> &result)
+    {
+        using namespace mgi;
+        LOG(V1_WARN, "Verifying GPU resolvents, this might be slow!\n");
+        ReadInfo readSize{lastClauseAmount * sizeof(MGIReservoir)};
+        ReadLock lock = _mgi_api.readMemory(currentReservoir, from(readSize));
+        auto reservoirsCurrent = ((MGIReservoir *)lock.ptr[0]);
+
+        auto startPtr = result.begin();
+        uint32_t reservoirID = 0;
+        uint32_t clauseCount = 0;
+        for (auto &reservoir : mgi::span<MGIReservoir>(reservoirsCurrent, lastClauseAmount))
+        {
+            reservoirID++;
+            if (reservoir.resolve.literal == 0)
+                continue;
+            const auto endPtr = std::find(startPtr, result.end(), 0);
+            std::vector<int> resolvedClause(startPtr, endPtr);
+            auto clauseSize = std::distance(startPtr, endPtr);
+            if (clauseSize <= 0)
+            {
+                LOG(V0_CRIT, "Produced empty clause %lu!\n", reservoirID);
+                assert(false);
+            }
+            clauseCount++;
+            if (reservoir.resolve.resolvedSize != clauseSize)
+            {
+                LOG(V0_CRIT, "Produced %lu clause of size %lu but reservoir %lu expected %u!\n", clauseCount, clauseSize, reservoirID, reservoir.resolve.resolvedSize);
+                assert(false);
+            }
+            const auto &page = pagesLoaded[reservoir.resolve.page];
+            std::array<std::vector<int>, 2> clauses;
+            std::array<std::tuple<uint32_t, uint32_t>, 2> indexRanges = {{{0, 0}, {0, 0}}};
+            for (auto clauseID : {reservoir.resolve.clauseOne, reservoir.resolve.clauseTwo})
+            {
+                ReadInfo readSize{2 * sizeof(uint32_t), clauseID * sizeof(uint32_t)};
+                ReadLock lock = _mgi_api.readMemory(page[1], from(readSize));
+                const auto clauseOnePtr = (uint32_t *)lock.ptr[0];
+                indexRanges[clauseID == reservoir.resolve.clauseOne ? 0 : 1] = {clauseOnePtr[0], clauseOnePtr[1]};
+            }
+            for (uint32_t i = 0; i < 2; i++)
+            {
+                const auto &[startIdx, endIdx] = indexRanges[i];
+                const auto size = endIdx - startIdx;
+                ReadInfo readSize{size * sizeof(int), startIdx * sizeof(int)};
+                ReadLock lock = _mgi_api.readMemory(page[0], from(readSize));
+                clauses[i].assign((int *)lock.ptr[0], (int *)lock.ptr[0] + size - 1);
+            }
+            bool foundAny = false;
+            for (uint32_t i = 0; i < 2; i++)
+            {
+                bool found = std::find(clauses[i].begin(), clauses[i].end(), reservoir.resolve.literal) != clauses[i].end();
+                if (found)
+                {
+                    size_t otherIdx = (i + 1) % 2;
+                    bool found2 = std::find(clauses[otherIdx].begin(), clauses[otherIdx].end(), -reservoir.resolve.literal) != clauses[otherIdx].end();
+                    foundAny = true;
+                    if (found2)
+                        break;
+                }
+            }
+            if (!foundAny)
+            {
+                LOG(V0_CRIT, "Produced resolvent %lu with resolved literal %d but no parent clause contained it!\n", reservoirID, reservoir.resolve.literal);
+                assert(false);
+            }
+            for (const auto &lit : resolvedClause)
+            {
+                bool found = std::find(clauses[0].begin(), clauses[0].end(), lit) != clauses[0].end() || std::find(clauses[1].begin(), clauses[1].end(), lit) != clauses[1].end();
+                if (!found)
+                {
+                    LOG(V0_CRIT, "Produced resolvent %lu with literal %d but no parent clause contained it!\n", reservoirID, lit);
+                    assert(false);
+                }
+            }
+            for (size_t i = 0; i < 2; i++)
+            {
+                for (const auto &lit : clauses[i])
+                {
+                    if (lit == reservoir.resolve.literal || lit == -reservoir.resolve.literal)
+                        continue;
+                    bool found = std::find(resolvedClause.begin(), resolvedClause.end(), lit) != resolvedClause.end();
+                    if (!found)
+                    {
+                        LOG(V0_CRIT, "Produced resolvent %lu missing literal %d from parent clause %lu!\n", reservoirID, lit, i);
+                        assert(false);
+                    }
+                }
+            }
+            startPtr = endPtr + 1;
+        }
+    }
+
     inline std::vector<int> pullResolveFromGPU()
     {
         using namespace mgi;
-        if(!lastTask) {
+        if (!lastTask)
+        {
             LOG(V1_WARN, "No resolvent task was started, therefore could not pull from GPU!\n");
             return {};
         }
@@ -183,44 +279,16 @@ private:
         printDebugOutput(_mgi_api, resolutionKernel, mgiInfo);
 
         ReadInfo readInfo{output.size};
-        ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
-        const auto start = (int *)lock.ptr[0];
-        std::vector<int> result(start, start + sizeRead);
+        std::vector<int> result;
+        {
+            ReadLock lock = _mgi_api.readMemory(outputResolve, from(readInfo));
+            const auto start = (int *)lock.ptr[0];
+            result.assign(start, start + sizeRead);
+        }
 
-        if(_verify_gpu_resolvents && !result.empty()) {
-            LOG(V1_WARN, "Verifying GPU resolvents, this might be slow!\n");
-            ReadInfo readSize{lastClauseAmount * sizeof(MGIReservoir)};
-            ReadLock lock = _mgi_api.readMemory(currentReservoir, from(readSize));
-            auto reservoirsCurrent = ((MGIReservoir *)lock.ptr[0]);
-            
-            auto startPtr = result.begin();
-            uint32_t clauseIdx = 0;
-            uint32_t emptyClauseCount = 0;
-            for(size_t i = 0; i < result.size(); i++) {
-                if(result[i] == 0) {
-                    const auto endPtr = result.begin() + i;
-                    auto clauseSize = std::distance(startPtr, endPtr);
-                    if(clauseSize <= 0) {
-                        LOG(V0_CRIT, "Produced empty clause %lu!\n", clauseIdx);
-                        assert(false);
-                    }
-                    auto& reservoir = reservoirsCurrent[clauseIdx];
-                    while(reservoir.weight == 0.0f || reservoir.resolve.literal == 0) {
-                        if(clauseIdx >= lastClauseAmount) {
-                            LOG(V0_CRIT, "Not enough full reservoirs with %lu empty from %lu!\n", emptyClauseCount, lastClauseAmount);
-                            assert(false);
-                        }
-                        reservoir = reservoirsCurrent[++clauseIdx];
-                        emptyClauseCount++;
-                    }
-                    if(reservoir.resolve.resolvedSize != clauseSize) {
-                        LOG(V0_CRIT, "Produced %lu clause of size %lu but reservoir expected %u!\n", clauseIdx, clauseSize, reservoir.resolve.resolvedSize);
-                        assert(false);
-                    }
-                    startPtr = endPtr + 1;
-                    clauseIdx++;
-                }
-            }
+        if (_verify_gpu_resolvents)
+        {
+            verifyGPUResolvents(result);
         }
 
         for (const auto &page : pagesLoaded)
@@ -265,32 +333,33 @@ public:
     }
 
     // Called from MPI (sharing) side
-    void insertOriginalClauses(const int* begin, size_t size)
+    void insertOriginalClauses(const int *begin, size_t size)
     {
         insertClausesFromSharing(begin, size);
     }
 
     // Called from MPI (sharing) side; variant for sharing buffer
-    void insertClausesFromSharing(BufferReader& reader)
+    void insertClausesFromSharing(BufferReader &reader)
     {
         size_t nbAdded = 0;
 
-        while (true) {
+        while (true)
+        {
             Mallob::Clause clause = reader.getNextIncomingClause();
-            if (!clause.begin) break;
+            if (!clause.begin)
+                break;
             insertClausesFromSharing(
                 clause.begin + ClauseMetadata::numInts(),
-                clause.size - ClauseMetadata::numInts()
-            );
+                clause.size - ClauseMetadata::numInts());
             nbAdded++;
         }
 
         LOG(V2_INFO, "[GPU] pre-buf received %lu clauses from sharing for GPU\n", nbAdded);
     }
     // Called from MPI (sharing) side; variant for plain list of zero-terminated clauses
-    void insertClausesFromSharing(const int* begin, size_t size)
+    void insertClausesFromSharing(const int *begin, size_t size)
     {
-        _pre_buffer.insert(begin, begin+size);
+        _pre_buffer.insert(begin, begin + size);
     }
 
     // Called from MPI (sharing) side
