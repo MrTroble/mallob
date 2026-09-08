@@ -312,6 +312,8 @@ if(NOT DEFINED MALLOB_MGI_TEST_COMPILE)
 set(MALLOB_MGI_TEST_COMPILE Off)
 endif()
 
+make_directory("${CMAKE_BINARY_DIR}/mgi_kernel/")
+
 # Test compile kernels
 if(${MALLOB_MGI_TEST_COMPILE})
 foreach(file ${kernelfiles})
