@@ -101,7 +101,8 @@ MGI_STRUCT(MGIResolveInfo) {
     m_uint clauseOne;
     m_uint clauseTwo;
     m_uint resolvedSize;
-    m_uint page;
+    m_uint page1;
+    m_uint page2;
 };
 
 MGI_STRUCT(MGIAtomicReservoir) {

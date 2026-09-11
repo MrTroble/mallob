@@ -71,6 +71,7 @@ inline std::pair<std::vector<int>, std::vector<uint32_t>> mgi_generate(const std
 {
     std::vector<int> assig;
     std::vector<uint32_t> starts;
+    starts.push_back(0); // PAGE ID at the start
     for (auto &vecs : values)
     {
         const auto current = assig.size();
@@ -81,7 +82,6 @@ inline std::pair<std::vector<int>, std::vector<uint32_t>> mgi_generate(const std
     }
     starts.push_back(assig.size());
     sizeX = values.size();
-    starts.push_back(0); // PAGE ID at the end
     return {assig, starts};
 }
 
@@ -315,7 +315,7 @@ namespace test
             std::vector<m_uint> outs{0, 0, 0};
             std::vector<int> values{};
             values.resize(3);
-            resolve(&mgiInfo, reservoir.data(), literals.data(), ends.data(), outs.data(), values.data());
+            resolve(&mgiInfo, reservoir.data(), literals.data(), ends.data(), literals.data(), ends.data(), outs.data(), values.data());
             assert(values[0] == 1);
             assert(values[1] == 3);
             assert(values[2] == 6);

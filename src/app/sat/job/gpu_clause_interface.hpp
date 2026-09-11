@@ -52,7 +52,9 @@ private:
 
         // TODO Prefix calculations multi threaded!!!
         std::vector<uint32_t> prefixes;
+        prefixes.push_back((uint32_t)pagesLoaded.size()); // ADD CURRENT PAGE ID AT THE START
         prefixes.push_back(0);
+
         uint32_t maxSize = 0;
         // TODO Do not extra copy! Sort somewhere else
         std::vector<int> copy(values.begin(), values.end());
@@ -68,7 +70,8 @@ private:
         }
         maxSize *= maxSize; // Could be quadratic
 
-        auto clauseAmount = prefixes.size();
+        auto clauseAmount = prefixes.size() - 1;
+
         // Past the end
         const auto last = prefixes.back();
         if (last < values.size())
@@ -88,7 +91,6 @@ private:
         }
         assert(clauseAmount != SIZE_MAX);
 
-        prefixes.push_back(pagesLoaded.size()); // ADD CURRENT PAGE ID AT THE END
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
         const auto sizeOfResolventInfos = clauseAmount * sizeof(MGIReservoir);
@@ -101,7 +103,7 @@ private:
         if (lastClauseAmount < clauseAmount)
         { // Reallocate after size changes
             const std::array realloc = {AllocationInfo::from(MemoryType::DeviceLocal, sizeOfResolventInfos),
-                                        AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 1) * sizeof(m_uint))};
+                                        AllocationInfo::from(MemoryType::DeviceLocal, (clauseAmount + 2) * sizeof(m_uint))};
             const auto reservoirMemory = _mgi_api.allocate(realloc);
             if (currentReservoir)
             {
@@ -162,12 +164,12 @@ private:
                 LOG(V0_CRIT, "Produced %lu clause of size %lu but reservoir %lu expected %u!\n", clauseCount, clauseSize, reservoirID, reservoir.resolve.resolvedSize);
                 assert(false);
             }
-            const auto &page = pagesLoaded[reservoir.resolve.page];
+            const auto &page = pagesLoaded[reservoir.resolve.page1];
             std::array<std::vector<int>, 2> clauses;
             std::array<std::tuple<uint32_t, uint32_t>, 2> indexRanges = {{{0, 0}, {0, 0}}};
             for (auto clauseID : {reservoir.resolve.clauseOne, reservoir.resolve.clauseTwo})
             {
-                ReadInfo readSize{2 * sizeof(uint32_t), clauseID * sizeof(uint32_t)};
+                ReadInfo readSize{2 * sizeof(uint32_t), (clauseID + 1) * sizeof(uint32_t)};
                 ReadLock lock = _mgi_api.readMemory(page[1], from(readSize));
                 const auto clauseOnePtr = (uint32_t *)lock.ptr[0];
                 indexRanges[clauseID == reservoir.resolve.clauseOne ? 0 : 1] = {clauseOnePtr[0], clauseOnePtr[1]};
@@ -247,7 +249,7 @@ private:
         taskInfo.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
         _mgi_api.queueWaitTasks(from(taskInfo));
 
-        ReadInfo readSize{sizeof(uint32_t), lastClauseAmount * sizeof(uint32_t)};
+        ReadInfo readSize{sizeof(uint32_t), (lastClauseAmount + 1) * sizeof(uint32_t)};
         uint32_t sizeRead = 0;
         {
             ReadLock lock = _mgi_api.readMemory(outputResolveIndices, from(readSize));
@@ -271,7 +273,8 @@ private:
             TaskInfo resolveTask{{}, TaskType::Burst, {lastClauseAmount, 1, 1}};
             resolveTask.kernel = this->resolutionKernel;
             resolveTask.function = "resolve";
-            resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1], outputResolveIndices, outputResolve};
+            resolveTask.descriptor.memory = {mgiInfo, currentReservoir, page[0], page[1]
+                , page[0], page[1], outputResolveIndices, outputResolve};
             resolveTask.groupSizes[0] = std::min(lastClauseAmount, (size_t)16);
             tasks[pageIdx++] = resolveTask;
         }
