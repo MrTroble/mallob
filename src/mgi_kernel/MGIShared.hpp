@@ -33,6 +33,7 @@ extern "C" {
 
     typedef std::atomic<float> atomic_float;
     typedef std::atomic<int> atomic_int;
+    typedef uint2 m_uint2;
 
     #define MGI_K_INLINE inline
 

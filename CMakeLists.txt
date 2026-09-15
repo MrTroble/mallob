@@ -205,7 +205,11 @@ message("GPU Support enabled")
 file(GLOB kernelfiles "src/mgi_kernel/*.*")
 
 include(FetchContent)
-if(NOT DEFINED MALLOB_GPU_API OR ${MALLOB_GPU_API} STREQUAL "OPENCL")
+
+if(NOT DEFINED MALLOB_GPU_API)
+set(MALLOB_GPU_API "OPENCL")
+endif()
+if(${MALLOB_GPU_API} STREQUAL "OPENCL")
     message("Using OpenCL as GPU API")
     set(OPENCL_SDK_BUILD_SAMPLES false)
     FetchContent_Declare(
@@ -255,7 +259,8 @@ if(NOT DEFINED MALLOB_GPU_API OR ${MALLOB_GPU_API} STREQUAL "OPENCL")
 
     set(BASE_INCLUDES ${BASE_INCLUDES} ${openclsdk_SOURCE_DIR}/external/OpenCL-CLHPP/include
                                  ${openclsdk_SOURCE_DIR}/external/OpenCL-Headers)
-    add_definitions(-DMGI_API_OCL=1)
+    add_definitions(-DMGI_API_OCL_HOST=1 -DMALLOB_USE_GPU=1)
+
 elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     message("Using Vulkan as GPU API")
     FetchContent_Declare(
