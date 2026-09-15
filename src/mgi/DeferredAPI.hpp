@@ -264,7 +264,6 @@ namespace mgi
     struct MemoryDescriptor
     {
         std::vector<Memory> memory;
-        std::vector<BufferRange> ranges; // optional
     };
 
     struct Task : public TypeHandle
