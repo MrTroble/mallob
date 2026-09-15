@@ -9,6 +9,13 @@ namespace mgi
 {
     using DeferredAPI = mgi::OCLDeferredAPI;
 }
+#elif defined(MGI_API_VULKAN_HOST)
+#include "DeferredAPIVulkan.hpp"
+
+namespace mgi
+{
+    using DeferredAPI = mgi::VulkanDeferredAPI;
+}
 #endif
 
 #ifndef MALLOB_USE_GPU // Dummy

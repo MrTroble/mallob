@@ -13,6 +13,8 @@
 
 extern volatile int gdb_attached;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 static void __implWaitForDebugger() {
     SysState_disableUnresponsiveNodeCrashing(); \
     LOG(V1_WARN, "%s, %d\n", SysState_isUnresponsiveNodeCrashingEnabled() ? "true":"false", MyMpi::rank(MPI_COMM_WORLD));\
@@ -21,6 +23,7 @@ static void __implWaitForDebugger() {
         std::this_thread::sleep_for(std::chrono::seconds(1)); 
     }
 }
+#pragma GCC diagnostic pop
 
 #ifdef DEBUG
 #define WAIT_FOR_DEBUGGER  __implWaitForDebugger();
