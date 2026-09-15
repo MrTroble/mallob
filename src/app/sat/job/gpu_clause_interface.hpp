@@ -42,22 +42,12 @@ private:
 
     const int pageSize{65536};
 
-    // TODO getLoad() function or sth similar?
-    // Function called from within (?)
-    inline void pushClausesToGpu(mgi::span<const int> values)
-    {
-        LOG(V3_VERB, "Start push to GPU\n");
-        // TODO add compression stages and use the correct kernel
-        using namespace mgi;
-
-        // TODO Prefix calculations multi threaded!!!
+    inline std::tuple<size_t, size_t, std::vector<uint32_t>> prepareClauseFormat(mgi::span<int> values) {
         std::vector<uint32_t> prefixes;
         prefixes.push_back((uint32_t)pagesLoaded.size()); // ADD CURRENT PAGE ID AT THE START
         prefixes.push_back(0);
 
         uint32_t maxSize = 0;
-        // TODO Do not extra copy! Sort somewhere else
-        std::vector<int> copy(values.begin(), values.end());
         for (auto i = std::find(values.begin(), values.end(), 0);
              i != values.end(); i = std::find(i + 1, values.end(), 0))
         {
@@ -65,7 +55,7 @@ private:
             const auto current = std::distance(values.begin(), i);
             prefixes.push_back(current + 1);
             maxSize = std::max(maxSize, (uint32_t)(current - last));
-            std::sort(copy.begin() + last, copy.begin() + current, [](auto valueL, auto valueR)
+            std::sort(values.begin() + last, values.begin() + current, [](auto valueL, auto valueR)
                       { return abs(valueL) < abs(valueR); });
         }
         maxSize *= maxSize; // Could be quadratic
@@ -76,7 +66,7 @@ private:
         const auto last = prefixes.back();
         if (last < values.size())
         {
-            std::sort(copy.begin() + last, copy.end(), [](auto valueL, auto valueR)
+            std::sort(values.begin() + last, values.end(), [](auto valueL, auto valueR)
                       { return abs(valueL) < abs(valueR); });
             prefixes.push_back(std::distance(values.begin(), values.end()) + 1);
         }
@@ -84,12 +74,26 @@ private:
         {
             clauseAmount--; // We have a trailing zero;
         }
+        assert(clauseAmount != SIZE_MAX);
+        return { clauseAmount, maxSize, std::move(prefixes) };
+    }
+
+    // TODO getLoad() function or sth similar?
+    // Function called from within (?)
+    inline void pushClausesToGpu(mgi::span<const int> values)
+    {
+        LOG(V3_VERB, "Start push to GPU\n");
+        using namespace mgi;
+
+        // TODO Prefix calculations multi threaded!!!
+        // TODO Do not extra copy! Sort somewhere else
+        std::vector<int> copy(values.begin(), values.end());
+        const auto [clauseAmount, maxSize, prefixes] = prepareClauseFormat({copy});
         if (clauseAmount == 0)
         {
             LOG(V1_WARN, "No resolvents submitted to gpu!\n");
             return;
         }
-        assert(clauseAmount != SIZE_MAX);
 
         // We need n^2 / 2 to compare each to each
         const auto sizeOfY = (size_t)floor((float)(clauseAmount) / 2.0f);
