@@ -202,11 +202,7 @@ publish_app_registry_changes()
 if(${MALLOB_USE_GPU})
 message("GPU Support enabled")
 
-<<<<<<< HEAD
 file(GLOB kernelfiles "src/mgi_kernel/*.*")
-=======
-
->>>>>>> 0121a2e2 (fix: added makedir)
 
 include(FetchContent)
 
