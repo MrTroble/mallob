@@ -46,7 +46,7 @@ MGI_KERNEL(findResolvents) (MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, M
 }
 
 // TODO Prefetching
-MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, 
+MGI_KERNEL(findResolventsReservoir)(MGI_GLOBAL MGIInfo *info, 
     MGI_IN int *clauses1, MGI_IN m_uint *clausesStarts1,
     MGI_IN int *clauses2, MGI_IN m_uint *clausesStarts2, MGI_GLOBAL MGIReservoir *toResolve)
 {
@@ -154,7 +154,7 @@ MGI_KERNEL(clauseOuts)(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, M
 MGI_KERNEL(debugReset)(MGI_GLOBAL MGIInfo *info) { info->__pDebugHelper.lastIndex = 0; }
 
 // Merge for resolve
-MGI_KERNEL void resolve(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 
+MGI_KERNEL(resolve)(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, 
                         MGI_IN int *clauses1, MGI_IN m_uint *clausesStarts1, 
                         MGI_IN int *clauses2, MGI_IN m_uint *clausesStarts2, 
                         MGI_IN m_uint *clauseOuts, MGI_GLOBAL int *newClause)
