@@ -278,15 +278,12 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     set(ENV{CMAKE_PREFIX_PATH} "$ENV{VULKAN_SDK}:$ENV{VULKAN_SDK}/lib/VulkanLoader")
 
     # TODO use find package find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
-    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} $ENV{VULKAN_SDK}/lib)
-    set(BASE_LIBS ${BASE_LIBS} libvulkan)
-    set(BASE_INCLUDES ${BASE_INCLUDES} $ENV{VULKAN_SDK}/include)
-
     find_package(Python)
 
     find_package(Vulkan 1.4 REQUIRED)
 
-    set(BASE_LIBS ${BASE_LIBS} ${Vulkan_LIBRARIES})
+    message(${Vulkan_LIBRARIES})
+    set(BASE_LIBS ${BASE_LIBS} "${Vulkan_LIBRARIES}")
     set(BASE_INCLUDES ${BASE_INCLUDES} ${Vulkan_INCLUDE_DIRS})
 
     FetchContent_Declare(
@@ -296,7 +293,7 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     )
     FetchContent_MakeAvailable(clspv)
 
-    add_definitions(-DMGI_API_VULKAN=1)
+    add_definitions(-DMGI_API_VULKAN_HOST=1)
 
     #vulkan compiles
     foreach(file ${kernelfiles})
