@@ -117,7 +117,7 @@ private:
             lastClauseAmount = clauseAmount;
         }
         _mgi_api.writeMemory(mgiInfo, from(BufferUpdateInfo::from(from(maxSize))));
-        std::vector<mgi::Memory> descriptors = {mgiInfo, memories[0], memories[1], currentReservoir};
+        std::vector<mgi::Memory> descriptors = {mgiInfo, memories[0], memories[1], memories[0], memories[1], currentReservoir};
         // TODO Reuse allocation
 
         TaskInfo taskInfo{{}, TaskType::Long, {clauseAmount, sizeOfY, 1}};

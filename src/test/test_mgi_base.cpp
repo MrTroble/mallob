@@ -278,7 +278,7 @@ namespace test
 
         {
             MGIReservoir reservoir;
-            findResolventsReservoir(&mgiInfo, clauses.data(), beginings.data(), &reservoir);
+            findResolventsReservoir(&mgiInfo, clauses.data(), beginings.data(), clauses.data(), beginings.data(), &reservoir);
             assert(reservoir.resolve.literal == 0);
             // Tautology should not be added to reservoir
         }
@@ -286,7 +286,7 @@ namespace test
         {
             auto [literals, ends] = generate({{1, -2, 3}, {1, 5, 6}}); // Not resolvable
             MGIReservoir reservoir{{0}, 0};
-            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), &reservoir);
+            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), literals.data(), ends.data(), &reservoir);
             assert(reservoir.resolve.literal == 0);
             resolves.clear();
             resolves.resize(2);
@@ -302,7 +302,7 @@ namespace test
             for (size_t i = 0; i < reservoir.size(); i++)
             {
                 MGI_GID_X = i;
-                findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), reservoir.data());
+                findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), literals.data(), ends.data(), reservoir.data());
             }
             assert(reservoir[2].resolve.literal == 2);
             assert(reservoir[2].resolve.resolvedSize == 3);
@@ -326,9 +326,9 @@ namespace test
             MGI_GSIZE_Y = 1;
             MGI_GID_X = 0;
             std::array<MGIReservoir, 2> reservoir;
-            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), reservoir.data());
+            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), literals.data(), ends.data(), reservoir.data());
             MGI_GID_X = 1;
-            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), reservoir.data());
+            findResolventsReservoir(&mgiInfo, literals.data(), ends.data(), literals.data(), ends.data(), reservoir.data());
             assert(reservoir[0].resolve.literal == 2);
             assert(reservoir[0].resolve.resolvedSize == 3);
             assert(reservoir[0].resolve.clauseOne == 0);
