@@ -46,20 +46,23 @@ MGI_KERNEL(findResolvents) (MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, M
 }
 
 // TODO Prefetching
-MGI_KERNEL(findResolventsReservoir)(MGI_GLOBAL MGIInfo *info, MGI_IN int *clauses, MGI_IN m_uint *clausesStarts, MGI_GLOBAL MGIReservoir *toResolve)
+MGI_KERNEL void findResolventsReservoir(MGI_GLOBAL MGIInfo *info, 
+    MGI_IN int *clauses1, MGI_IN m_uint *clausesStarts1,
+    MGI_IN int *clauses2, MGI_IN m_uint *clausesStarts2, MGI_GLOBAL MGIReservoir *toResolve)
 {
-    const m_uint position = clausesStarts[MGI_GID_X + 1];
-    const m_uint sizeOfClause = clausesStarts[MGI_GID_X + 2] - position - 1;
+    const m_uint position = clausesStarts1[MGI_GID_X + 1];
+    const m_uint sizeOfClause = clausesStarts1[MGI_GID_X + 2] - position - 1;
 
     // TODO Use LOCAL reservoir and ONLY MERGE AT THE END! Shuffle reservoirs
     // TODO Check Register pressure
     // TODO Use shared cache for clause lookups
     
     //Start is the page index
-    const m_uint pageIndex = clausesStarts[0];
+    const m_uint pageIndex1 = clausesStarts1[0];
+    const m_uint pageIndex2 = clausesStarts2[0];
 
     MGI_LOCAL MGIReservoir currentReservoir;
-    if(pageIndex == 0) {
+    if(pageIndex1 == 0) {
         currentReservoir.weight = 0;
         currentReservoir.resolve.literal = 0;
         currentReservoir.resolve.page1 = 0;
@@ -75,8 +78,8 @@ MGI_KERNEL(findResolventsReservoir)(MGI_GLOBAL MGIInfo *info, MGI_IN int *clause
     {
         MGI_LOCAL MGIResolveInfo resolve;
         resolve.clauseOne = MGI_GID_X;
-        resolve.page1 = pageIndex; // TODO MAKE READY FOR TWO PAGES
-        resolve.page2 = pageIndex;
+        resolve.page1 = pageIndex1; // TODO MAKE READY FOR TWO PAGES
+        resolve.page2 = pageIndex2;
 
         MGI_LOCAL MGIRng rng;
         mgiRNGInit(&rng, MGI_GID_X, 0, 1, 117007);
@@ -85,8 +88,8 @@ MGI_KERNEL(findResolventsReservoir)(MGI_GLOBAL MGIInfo *info, MGI_IN int *clause
         for (m_uint i = 0; i < MGI_GSIZE_Y; i++)
         {
             const m_uint index = (MGI_GID_X + i + 1) % MGI_GSIZE_X + 1;
-            m_uint otherBegin = clausesStarts[index];
-            const m_uint otherEnd = clausesStarts[index + 1] - 1;
+            m_uint otherBegin = clausesStarts2[index];
+            const m_uint otherEnd = clausesStarts2[index + 1] - 1;
             m_uint iter = currentBegin;
             resolve.literal = 0;
             resolve.clauseTwo = index - 1;
@@ -96,8 +99,8 @@ MGI_KERNEL(findResolventsReservoir)(MGI_GLOBAL MGIInfo *info, MGI_IN int *clause
 
             while(otherBegin < otherEnd && iter < currentEnd)
             {
-                const int l1 = clauses[iter];
-                const int l2 = clauses[otherBegin];
+                const int l1 = clauses1[iter];
+                const int l2 = clauses2[otherBegin];
                 
                 const int l1A = abs(l1);
                 const int l2A = abs(l2);

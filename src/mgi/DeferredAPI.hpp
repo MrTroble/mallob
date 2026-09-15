@@ -256,9 +256,15 @@ namespace mgi
         }
     };
 
+    struct BufferRange {
+        size_t offset = 0;
+        size_t size = SIZE_MAX;
+    };
+
     struct MemoryDescriptor
     {
         std::vector<Memory> memory;
+        std::vector<BufferRange> ranges; // optional
     };
 
     struct Task : public TypeHandle
