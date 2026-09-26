@@ -13,6 +13,7 @@ namespace mgi
         std::vector<uint32_t> queueFamilies;
         std::vector<vk::Device> devices;
         std::vector<vk::Queue> queues;
+        std::vector<vk::CommandPool> commandPools;
     }; 
 
     class VulkanDeferredAPI
@@ -106,7 +107,22 @@ namespace mgi
         VulkanSetup setup;
 
         std::vector<const char*> extensions;
-        std::vector<const char*> layers{ "VK_LAYER_KHRONOS_VALIDATION" };
+        std::array<const char*, 1> layersRequested = { "VK_LAYER_KHRONOS_validation" };
+        std::vector<const char*> layers;
+        const auto layerProperties = vk::enumerateInstanceLayerProperties();
+        for (const auto layer : layersRequested)
+        {
+            const auto found = std::find_if(layerProperties.begin(), layerProperties.end(), [=](const vk::LayerProperties &lp) {
+                LOG(V3_VERB, "Found Vulkan layer: %s\n", lp.layerName.data());
+                return strcmp(lp.layerName.data(), layer) == 0;
+            });
+            if(found == layerProperties.end()) {
+                LOG(V1_WARN, "Vulkan layer %s not found, skipping!\n", layer);
+                continue;
+            }
+            layers.push_back(layer);
+        }
+
         static vk::ApplicationInfo appInfo("Mallob", VK_MAKE_VERSION(1, 0, 0), "Mallob", VK_MAKE_VERSION(1, 0, 0), VK_API_VERSION_1_3);
         vk::InstanceCreateInfo instanceCreateInfo({}, &appInfo, layers, extensions);
         setup.instance = vk::createInstance(instanceCreateInfo);
@@ -115,12 +131,14 @@ namespace mgi
         const auto physicalDevices = setup.instance.enumeratePhysicalDevices();
 
         vk::DeviceQueueCreateInfo queueCreateInfo({}, 0, info.queuePriorities);
-        vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features> features;
-        auto& vulkan11Features = features.get<vk::PhysicalDeviceVulkan11Features>();
-        vulkan11Features.variablePointersStorageBuffer = true;
-        vulkan11Features.variablePointers = true;
+        static vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features> features;
+        auto& vulkan11FeaturesSet = features.get<vk::PhysicalDeviceVulkan11Features>();
+        vulkan11FeaturesSet.variablePointersStorageBuffer = true;
+        vulkan11FeaturesSet.variablePointers = true;
+        auto& physicalDeviceFeaturesSet = features.get<vk::PhysicalDeviceFeatures2>();
+        physicalDeviceFeaturesSet.features.shaderInt64 = true;
         vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, deviceExtensions);
-        deviceCreateInfo.pNext = &features;
+        deviceCreateInfo.pNext = &physicalDeviceFeaturesSet;
 
         for (const auto &phyDevice : physicalDevices)
         {
@@ -144,6 +162,11 @@ namespace mgi
                 LOG(V1_WARN, "Vulkan device %s does not support variable pointers, skipping!\n", deviceProperties.deviceName.data());
                 continue;
             }
+            const auto& physicalDeviceFeatures = featurePresent.get<vk::PhysicalDeviceFeatures2>();
+            if(!physicalDeviceFeatures.features.shaderInt64) {
+                LOG(V1_WARN, "Vulkan device %s does not support shaderInt64, skipping!\n", deviceProperties.deviceName.data());
+                continue;
+            }
             LOG(V2_INFO, "Found Vulkan device: %s\n", deviceProperties.deviceName.data());
 
             const auto computeQueueFamilyIndex = std::distance(queueFamilies.begin(), computeQueueFamily);
@@ -152,11 +175,12 @@ namespace mgi
             setup.devices.push_back(device);
             setup.queueFamilies.push_back(computeQueueFamilyIndex);
             setup.physicalDevices.push_back(phyDevice);
-            for (size_t i = 0; i < setup.physicalDevices.size(); i++)
+            for (size_t i = 0; i < queueCreateInfo.queueCount; i++)
             {
                 setup.queues.push_back(device.getQueue(computeQueueFamilyIndex, i));
             }
             vk::CommandPoolCreateInfo poolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, computeQueueFamilyIndex);
+            setup.commandPools.push_back(device.createCommandPool(poolCreateInfo));
         }
         if(setup.devices.empty()) {
             LOG(V0_CRIT, "No suitable Vulkan devices found!\n");
