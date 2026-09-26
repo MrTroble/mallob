@@ -1,6 +1,5 @@
 #include "MGIKernelDefs.hpp"
 #include "MGIShared.hpp"
-
 MGI_CONST m_uint MAX_SIZE_CACHED = 256;
 
 // TODO Redo with sorting
@@ -11,6 +10,7 @@ bool checkIsInverseIn(int clause, MGI_IN int *literalsBegin, MGI_IN int *literal
             return true; // SIMD?
     return false;
 }
+
 
 // TODO Reservoir based picking that only use different
 // use MGI_LOCAL MGIReservoir in order to only have atomics from each work group

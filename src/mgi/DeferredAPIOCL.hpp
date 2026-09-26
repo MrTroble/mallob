@@ -71,7 +71,7 @@ namespace mgi
         ProtectedMap<std::unordered_map<Memory, std::shared_mutex *>> perMemoryMutex;
         ProtectedMap<std::unordered_map<std::string, std::vector<std::pair<Kernel, cl_kernel>>>> kernelCache;
 
-        friend class KernelLoaderOCL;
+        friend class KernelLoader;
 
         cl_command_queue selectQueue()
         {

@@ -299,9 +299,10 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     foreach(file ${kernelfiles})
         cmake_path(GET file FILENAME filename)
 
+        message("${clspv_SOURCE_DIR}/clspv --cl-kernel-arg-info --cl-std=CL2.0 -I ${CMAKE_BINARY_DIR}/mgi_kernel -inline-entry-points -w -DMGI_API_OCL=1 --arch=spirv64 -DMALLOB_USE_GPU=1 $<$<CONFIG:Release>:-O2> ${file} -o ${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv")
         if(${filename} MATCHES ".*\\.cpp$")
         add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv" 
-        COMMAND ${clspv_SOURCE_DIR}/clspv --cl-std=CL2.0 -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-inline-entry-points" "-w" "-DMGI_API_OCL=1" "--arch=spirv64"
+        COMMAND ${clspv_SOURCE_DIR}/clspv --cl-kernel-arg-info --cl-std=CL2.0 -I "${CMAKE_BINARY_DIR}/mgi_kernel" "-inline-entry-points" "-w" "-DMGI_API_OCL=1" "--arch=spirv64"
         "-DMALLOB_USE_GPU=1" $<$<CONFIG:Release>:-O2> "${file}" -o "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv"
         MAIN_DEPENDENCY ${file} WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/mgi_kernel)
         list(APPEND SPV_TARGETS "${CMAKE_BINARY_DIR}/mgi_kernel/${filename}_v.spv")

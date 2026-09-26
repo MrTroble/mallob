@@ -8,18 +8,19 @@ namespace mgi {
     struct Kernel : public TypeHandle {};
     MGI_DEFINE_TYPE_HASH(mgi::Kernel);
 
+    struct VulkanDeferredAPI;
     struct OCLDeferredAPI;
 
-#ifdef MGI_API_OCL_HOST
-    class KernelLoaderOCL {
+    class KernelLoader {
 
     public:
-        KernelLoaderOCL() = default;
+        KernelLoader() = default;
 
+        #ifdef MGI_API_OCL_HOST
         Kernel loadKernel(OCLDeferredAPI* api, const std::string& file);
+        #elif defined(MGI_API_VULKAN_HOST)
+        Kernel loadKernel(VulkanDeferredAPI* api, const std::string& file);
+        #endif
     };
-
-    using KernelLoader = KernelLoaderOCL;
-#endif
 
 }

@@ -11,7 +11,7 @@ namespace mgi
 {
 
 #ifdef MGI_API_OCL_HOST
-    Kernel KernelLoaderOCL::loadKernel(OCLDeferredAPI *api, const std::string &file)
+    Kernel KernelLoader::loadKernel(OCLDeferredAPI *api, const std::string &file)
     {
         // TODO Auto package binaries
         const auto source = mgi::wholeFile<std::string>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file);
@@ -64,6 +64,22 @@ namespace mgi
         }
         const auto id = api->programs.size();
         api->programs.push_back(std::move(program));
+        return {id};
+    }
+#endif
+
+
+#ifdef MGI_API_VULKAN_HOST
+    Kernel KernelLoader::loadKernel(VulkanDeferredAPI *api, const std::string &file)
+    {
+        // TODO Caching
+        const auto source = mgi::wholeFile<std::string>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file + "_v.spv");
+        if (source.empty())
+            return {};
+        
+        const auto device = api->selectDevice();
+        api->shaderModules.push_back(device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t*)source.data())));
+        const auto id = api->shaderModules.size() - 1;
         return {id};
     }
 #endif
