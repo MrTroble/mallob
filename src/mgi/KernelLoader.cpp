@@ -77,7 +77,8 @@ namespace mgi
         if (source.empty())
             return {};
         
-        const auto device = api->selectDevice();
+        const auto deviceID = api->selectDevice();
+        const auto device = api->setup.devices[deviceID];
         api->shaderModules.push_back(device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t*)source.data())));
         const auto id = api->shaderModules.size() - 1;
         return {id};

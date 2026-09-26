@@ -6,6 +6,8 @@
 
 namespace mgi
 {   
+    using MemTypeTable = std::array<uint32_t, (uint32_t)MemoryType::Constant + 1>;
+
     struct VulkanSetup
     {
         vk::Instance instance;
@@ -14,6 +16,7 @@ namespace mgi
         std::vector<vk::Device> devices;
         std::vector<vk::Queue> queues;
         std::vector<vk::CommandPool> commandPools;
+        std::vector<MemTypeTable> memoryTypeIndices;
     }; 
 
     class VulkanDeferredAPI
@@ -25,16 +28,10 @@ namespace mgi
 
         friend class KernelLoader;
 
-        vk::PhysicalDevice selectPhyDevice()
+        uint32_t selectDevice()
         {
             // TODO make this device selection MPI dependent
-            return setup.physicalDevices[0];
-        }
-
-        vk::Device selectDevice()
-        {
-            // TODO make this device selection MPI dependent
-            return setup.devices[0];
+            return 0;
         }
 
         vk::Queue selectQueue()
@@ -53,7 +50,33 @@ namespace mgi
 
         std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
         {
-            return {};
+            const auto slabsToAlloc = strategy.slabs(infos);
+            const auto deviceID = selectDevice();
+            const auto& memTypeIndices = setup.memoryTypeIndices[deviceID];
+            const auto& device = setup.devices[deviceID];
+            std::vector<vk::DeviceMemory> allocatedMem;
+            for (const auto &slab : slabsToAlloc)
+            {
+                const auto memTypeIndex = memTypeIndices[(uint32_t)slab.type];
+                vk::MemoryAllocateInfo allocInfo(slab.size, memTypeIndex);
+                allocatedMem.push_back(device.allocateMemory(allocInfo));
+            }
+
+            std::vector<Memory> allocated;
+            const auto regionsToAlloc = strategy.regions(infos);
+            for (const auto &region : regionsToAlloc)
+            {
+                const auto mem = allocatedMem[region.index];
+                // TODO redo
+                const auto bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer;
+                vk::BufferCreateInfo bufferInfo({}, region.size, bufferUsage);
+                const auto buffer = device.createBuffer(bufferInfo);
+                Memory m;
+                m.internal = (size_t)(VkBuffer)buffer;
+                allocated.push_back(m);
+                device.bindBufferMemory(buffer, mem, region.offset);
+            }
+            return allocated;
         }
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads)
@@ -181,6 +204,25 @@ namespace mgi
             }
             vk::CommandPoolCreateInfo poolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, computeQueueFamilyIndex);
             setup.commandPools.push_back(device.createCommandPool(poolCreateInfo));
+            MemTypeTable memTypeTable;
+            const auto memProperties = phyDevice.getMemoryProperties();
+            bool foundDeviceLocal = false, foundHostVisible = false;
+            for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+            {
+                const auto memType = memProperties.memoryTypes[i];
+                const auto flags = memType.propertyFlags;
+                if(!foundDeviceLocal && flags & vk::MemoryPropertyFlagBits::eDeviceLocal) {
+                    memTypeTable[(uint32_t)MemoryType::DeviceLocal] = i;
+                    memTypeTable[(uint32_t)MemoryType::Constant] = i;
+                    foundDeviceLocal = true;
+                }
+                if(!foundHostVisible && flags & vk::MemoryPropertyFlagBits::eHostVisible) {
+                    memTypeTable[(uint32_t)MemoryType::Uniform] = i;
+                    memTypeTable[(uint32_t)MemoryType::Global] = i;
+                    foundHostVisible = true;
+                }
+            }
+            setup.memoryTypeIndices.push_back(memTypeTable);
         }
         if(setup.devices.empty()) {
             LOG(V0_CRIT, "No suitable Vulkan devices found!\n");
