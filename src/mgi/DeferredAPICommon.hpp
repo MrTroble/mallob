@@ -146,6 +146,12 @@ namespace mgi
         MemoryType type;
     };
 
+    struct MemoryRequirements
+    {
+        size_t size;
+        size_t alignment;
+    };
+
     struct AllocationRegions
     {
         size_t offset;
@@ -158,11 +164,11 @@ namespace mgi
 
         virtual ~AllocationStrategy();
 
-        virtual std::vector<AllocationSlab> slabs(span<const AllocationInfo> infos) const;
+        virtual std::vector<AllocationSlab> slabs(span<const AllocationInfo> infos, span<const MemoryRequirements> requirements) const;
 
         virtual bool needsSubBuffers(span<const AllocationInfo> infos) const;
 
-        virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos) const;
+        virtual std::vector<AllocationRegions> regions(span<const AllocationInfo> infos, span<const MemoryRequirements> requirements) const;
     };
 
     struct AllocationCache

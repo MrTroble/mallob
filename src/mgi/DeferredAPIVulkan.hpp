@@ -50,10 +50,25 @@ namespace mgi
 
         std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
         {
-            const auto slabsToAlloc = strategy.slabs(infos);
+            std::vector<Memory> allocated;
             const auto deviceID = selectDevice();
             const auto& memTypeIndices = setup.memoryTypeIndices[deviceID];
             const auto& device = setup.devices[deviceID];
+
+            std::vector<MemoryRequirements> requirements;
+            for (const auto &region : infos)
+            {
+                const auto bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer;
+                vk::BufferCreateInfo bufferInfo({}, region.size, bufferUsage);
+                const auto buffer = device.createBuffer(bufferInfo);
+                const auto memRequ = device.getBufferMemoryRequirements(buffer);
+                requirements.push_back({memRequ.size, memRequ.alignment});
+                Memory m;
+                m.internal = (size_t)(VkBuffer)buffer;
+                allocated.push_back(m);
+            }
+
+            const auto slabsToAlloc = strategy.slabs(infos, requirements);
             std::vector<vk::DeviceMemory> allocatedMem;
             for (const auto &slab : slabsToAlloc)
             {
@@ -62,20 +77,15 @@ namespace mgi
                 allocatedMem.push_back(device.allocateMemory(allocInfo));
             }
 
-            std::vector<Memory> allocated;
-            const auto regionsToAlloc = strategy.regions(infos);
-            for (const auto &region : regionsToAlloc)
+            const auto regionsToAlloc = strategy.regions(infos, requirements);
+            for (size_t i = 0; i < regionsToAlloc.size(); i++)
             {
+                const auto& region = regionsToAlloc[i];
+                const vk::Buffer buffer = *((VkBuffer*)&allocated[i].internal);
                 const auto mem = allocatedMem[region.index];
-                // TODO redo
-                const auto bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer;
-                vk::BufferCreateInfo bufferInfo({}, region.size, bufferUsage);
-                const auto buffer = device.createBuffer(bufferInfo);
-                Memory m;
-                m.internal = (size_t)(VkBuffer)buffer;
-                allocated.push_back(m);
                 device.bindBufferMemory(buffer, mem, region.offset);
             }
+            
             return allocated;
         }
 
