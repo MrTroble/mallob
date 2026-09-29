@@ -6,6 +6,7 @@
 #include <numeric>
 #include <chrono>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "comm/sysstate.hpp"
 #include <signal.h>

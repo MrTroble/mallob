@@ -29,22 +29,25 @@ namespace mgi
         std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram, kernelShared};
         std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp", "MGIShared.hpp"};
         std::string additionalOptions;
-        #ifdef DEBUG
-            // TODO CHECK available
-            additionalOptions += "-cl-nv-verbose -cl-nv-opt-level=0";
-        #endif
+#ifdef DEBUG
+        // TODO CHECK available
+        additionalOptions += "-cl-nv-verbose -cl-nv-opt-level=0";
+#endif
         std::string compilerOptions = additionalOptions + " -cl-std=CL2.0 -D MGI_API_OCL -I ./";
 
         try
         {
             program.compile(compilerOptions, defaultIncludePrograms, defaultIncludeNames);
-            for (auto& device : api->init.devicesUsed)
+            for (auto &device : api->init.devicesUsed)
             {
                 const auto log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
 #ifdef DEBUG
-                if(log.empty()) {
+                if (log.empty())
+                {
                     LOG(V2_INFO, "Build successful for %s!\n", file.c_str());
-                } else {
+                }
+                else
+                {
                     LOG(V2_INFO, "Build successful for %s with:\n", file.c_str());
                     LOG(V1_WARN, "%s\n", log.c_str());
                 }
@@ -68,7 +71,6 @@ namespace mgi
     }
 #endif
 
-
 #ifdef MGI_API_VULKAN_HOST
     Kernel KernelLoader::loadKernel(VulkanDeferredAPI *api, const std::string &file)
     {
@@ -76,10 +78,12 @@ namespace mgi
         const auto source = mgi::wholeFile<std::string>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file + "_v.spv");
         if (source.empty())
             return {};
-        
+
         const auto deviceID = api->selectDevice();
         const auto device = api->setup.devices[deviceID];
-        api->shaderModules.push_back(device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t*)source.data())));
+
+        std::lock_guard lg(api->shaderModuleLock);
+        api->shaderModules.push_back(device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t *)source.data())));
         const auto id = api->shaderModules.size() - 1;
         return {id};
     }
