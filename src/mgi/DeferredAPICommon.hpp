@@ -16,18 +16,20 @@ extern volatile int gdb_attached;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void __implWaitForDebugger() {
-    SysState_disableUnresponsiveNodeCrashing(); \
-    LOG(V1_WARN, "%s, %d\n", SysState_isUnresponsiveNodeCrashingEnabled() ? "true":"false", MyMpi::rank(MPI_COMM_WORLD));\
-    LOG(V1_WARN, "DEBUGGER MODE: Disabled unresponsivnes check\n"); \
-    while(gdb_attached == 0) {
-        std::this_thread::sleep_for(std::chrono::seconds(1)); 
+static void __implWaitForDebugger()
+{
+    SysState_disableUnresponsiveNodeCrashing();
+    LOG(V1_WARN, "%s, %d\n", SysState_isUnresponsiveNodeCrashingEnabled() ? "true" : "false", MyMpi::rank(MPI_COMM_WORLD));
+    LOG(V1_WARN, "DEBUGGER MODE: Disabled unresponsivnes check\n");
+    while (gdb_attached == 0)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 #pragma GCC diagnostic pop
 
 #ifdef DEBUG
-#define WAIT_FOR_DEBUGGER  __implWaitForDebugger();
+#define WAIT_FOR_DEBUGGER __implWaitForDebugger();
 #else
 #define WAIT_FOR_DEBUGGER
 #endif
@@ -57,10 +59,29 @@ namespace mgi
         void insert(typename BaseMap::value_type &&value)
         {
             std::lock_guard localGuard(mutex);
-            const auto eval = map.insert(std::forward(value));
+            const auto eval = map.insert(value);
 #ifdef DEBUG
             assert(eval.second);
 #endif
+        }
+
+        template <typename invoke>
+        const typename BaseMap::mapped_type insertOrUpdate(const typename BaseMap::key_type &key, const typename BaseMap::mapped_type &start, invoke &&invoker)
+        {
+            std::lock_guard localGuard(mutex);
+
+            const auto iter = map.find(key);
+            if (iter != std::end(map))
+            {
+                iter->second = invoker(iter->second);
+                return iter->second;
+            }
+
+            const auto eval = map.insert({key, start});
+#ifdef DEBUG
+            assert(eval.second);
+#endif
+            return eval.first->second;
         }
 
         template <typename InputIter>
@@ -115,7 +136,8 @@ namespace mgi
         }
     }
 
-    struct MemoryCopyInfo {
+    struct MemoryCopyInfo
+    {
         size_t size = 0;
         size_t srcOffset = 0;
         size_t destOffset = 0;
@@ -254,7 +276,8 @@ namespace mgi
         }
     };
 
-    struct BufferRange {
+    struct BufferRange
+    {
         size_t offset = 0;
         size_t size = SIZE_MAX;
     };

@@ -133,10 +133,15 @@ namespace mgi
             for (size_t i = 0; i < regionsToAlloc.size(); i++)
             {
                 const auto &region = regionsToAlloc[i];
-                const vk::Buffer buffer = *((VkBuffer *)&allocated[i].internal);
+                const auto intMem = allocated[i];
+                const vk::Buffer buffer = *((VkBuffer *)&intMem.internal);
                 const auto mem = allocatedMem[region.index];
                 device.bindBufferMemory(buffer, mem, region.offset);
 
+                bufferToMemLookup.insert({intMem.internal, VulkanMemoryRegion{mem, region.offset}});
+                const auto memid = *((size_t*)&mem);
+                memoryCounter.insertOrUpdate(memid, 1, [](size_t el) { return el + 1; });
+                
                 const auto &info = infos[i];
                 if (info.initialSize != 0 && info.initialMemory)
                 {
