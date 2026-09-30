@@ -4,10 +4,12 @@
 
 #include <vulkan/vulkan.hpp>
 
-#define CHECK_RESULT(result) if(result != vk::Result::eSuccess) {\
-                LOG(V0_CRIT, "VkResult is %s\n", vk::to_string(result).c_str());\
-                LOG(V0_CRIT, "In %s:%d\n", __FILE__, __LINE__);\
-            }
+#define CHECK_RESULT(result)                                             \
+    if (result != vk::Result::eSuccess)                                  \
+    {                                                                    \
+        LOG(V0_CRIT, "VkResult is %s\n", vk::to_string(result).c_str()); \
+        LOG(V0_CRIT, "In %s:%d\n", __FILE__, __LINE__);                  \
+    }
 
 namespace mgi
 {
@@ -43,10 +45,18 @@ namespace mgi
         size_t offset;
     };
 
-    struct CDVulkanHostAccessable {
+    struct CDVulkanHostAccessable
+    {
         vk::Device device;
         vk::DeviceMemory memory;
     };
+
+    struct CDVulkanDeviceLocal
+    {
+        vk::Device device;
+        PackedBuffer packed;
+    };
+
 
     class VulkanDeferredAPI
     {
@@ -59,7 +69,7 @@ namespace mgi
         ProtectedMap<std::unordered_map<size_t, size_t>> memoryCounter;
 
         ProtectedMap<std::unordered_map<size_t, MemoryType>> memoryType;
-        ProtectedMap<std::unordered_map<size_t, std::shared_mutex*>> memoryMutex;
+        ProtectedMap<std::unordered_map<size_t, std::shared_mutex *>> memoryMutex;
 
         friend class KernelLoader;
 
@@ -93,6 +103,26 @@ namespace mgi
             T *ptr = (T *)device.mapMemory(memory, offset, values.size_bytes());
             std::copy(values.begin(), values.end(), ptr);
             device.unmapMemory(memory);
+        }
+
+        inline void endSubmitAndWait(vk::Device device, vk::CommandPool cmdPool, vk::CommandBuffer cmd)
+        {
+            cmd.end();
+            const auto queue = selectQueue();
+            vk::SubmitInfo submitInfo = {{}, {}, cmd};
+            const auto fence = device.createFence({});
+            queue.submit(submitInfo, fence);
+            const auto result = device.waitForFences(fence, true, UINT64_MAX);
+            CHECK_RESULT(result);
+            device.freeCommandBuffers(cmdPool, cmd);
+            device.destroy(fence);
+        }
+
+        inline vk::CommandBuffer beginAndGet(vk::Device device, vk::CommandPool cmdPool) {
+            const auto cmd = device.allocateCommandBuffers({cmdPool, vk::CommandBufferLevel::ePrimary, 1}).back();
+            vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+            cmd.begin(beginInfo);
+            return cmd;
         }
 
     public:
@@ -133,11 +163,10 @@ namespace mgi
             }
 
             const auto cmdPool = setup.commandPools[deviceID];
-            const auto cmd = device.allocateCommandBuffers({cmdPool, vk::CommandBufferLevel::ePrimary, 1}).back();
             const auto regionsToAlloc = strategy.regions(infos, requirements);
             std::vector<PackedBuffer> packedBuffer;
-            vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-            cmd.begin(beginInfo);
+
+            const auto cmd = beginAndGet(device, cmdPool);
             for (size_t i = 0; i < regionsToAlloc.size(); i++)
             {
                 const auto &region = regionsToAlloc[i];
@@ -148,9 +177,10 @@ namespace mgi
 
                 bufferToMemLookup.insert({intMem.internal, VulkanMemoryRegion{mem, region.offset}});
                 memoryMutex.insert({intMem.internal, new std::shared_mutex});
-                const auto memid = *((size_t*)&mem);
-                memoryCounter.insertOrUpdate(memid, 1, [](size_t el) { return el + 1; });
-                
+                const auto memid = *((size_t *)&mem);
+                memoryCounter.insertOrUpdate(memid, 1, [](size_t el)
+                                             { return el + 1; });
+
                 const auto &info = infos[i];
                 memoryType.insert({intMem.internal, info.type});
                 if (info.initialSize != 0 && info.initialMemory)
@@ -170,24 +200,27 @@ namespace mgi
                     }
                 }
             }
-            cmd.end();
-            const auto queue = selectQueue();
-            vk::SubmitInfo submitInfo = {{}, {}, cmd};
-            const auto fence = device.createFence({});
-            queue.submit(submitInfo, fence);
-            const auto result = device.waitForFences(fence, true, UINT64_MAX);
-            CHECK_RESULT(result);
-            device.freeCommandBuffers(cmdPool, cmd);
-            device.destroy(fence);
-            for(auto& b : packedBuffer) b.destroy(device);
+            endSubmitAndWait(device, cmdPool, cmd);
+            for (auto &b : packedBuffer)
+                b.destroy(device);
             return allocated;
         }
 
-        static void deleteHostAccessable(std::vector<void*>& ptr, void* cData) {
-            CDVulkanHostAccessable* data = (CDVulkanHostAccessable*) cData;
+        static void deleteHostAccessable(std::vector<void *> &ptr, void *cData)
+        {
+            CDVulkanHostAccessable *data = (CDVulkanHostAccessable *)cData;
             data->device.unmapMemory(data->memory);
             delete data;
         }
+
+        static void deleteDeviceLocal(std::vector<void *> &ptr, void *cData)
+        {
+            CDVulkanDeviceLocal *data = (CDVulkanDeviceLocal *)cData;
+            data->device.unmapMemory(data->packed.memory);
+            data->packed.destroy(data->device);
+            delete data;
+        }
+
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads)
         {
@@ -198,16 +231,47 @@ namespace mgi
             const auto deviceID = selectDevice();
             const auto device = setup.devices[deviceID];
 
-            if(isHostAccessable(type)) {
-                uint8_t* ptr = (uint8_t*)device.mapMemory(infoMem.memory, infoMem.offset, VK_WHOLE_SIZE);
+            if (isHostAccessable(type))
+            {
+                uint8_t *ptr = (uint8_t *)device.mapMemory(infoMem.memory, infoMem.offset, VK_WHOLE_SIZE);
                 rl.ptr.reserve(reads.size());
                 rl.releaseFunction = &deleteHostAccessable;
                 rl.customData = new CDVulkanHostAccessable{device, infoMem.memory};
-                for(const auto& r : reads) {
+                for (const auto &r : reads)
+                {
                     rl.ptr.push_back(ptr + r.offset);
                 }
-            } else {
+            }
+            else
+            {
+                vk::Buffer bufferDst = *((vk::Buffer*)&memory.internal);
+                const auto &memTypeIndices = setup.memoryTypeIndices[deviceID];
+                size_t amount = std::accumulate(reads.begin(), reads.end(), 0u, [](size_t t, const auto &read)
+                                                { return t + read.size; });
+                PackedBuffer buffer = allocatePackedBuffer(amount, device, memTypeIndices[(size_t)MemoryType::Global], vk::BufferUsageFlagBits::eTransferDst);
+                const auto cmdPool = setup.commandPools[deviceID];
+
+                const auto cmd = beginAndGet(device, cmdPool);
+                std::vector<vk::BufferCopy> copies;
+                size_t destOffset = 0;
+                for(const auto& r : reads) {
+                    vk::BufferCopy cCopy(r.offset, destOffset, r.size);
+                    destOffset += r.size;
+                    copies.push_back(cCopy);
+                }
+                cmd.copyBuffer(bufferDst, buffer.buffer, copies);
+                endSubmitAndWait(device, cmdPool, cmd);
                 
+                uint8_t *ptr = (uint8_t *)device.mapMemory(buffer.memory, 0, VK_WHOLE_SIZE);
+                rl.ptr.reserve(reads.size());
+                rl.releaseFunction = &deleteDeviceLocal;
+                rl.customData = new CDVulkanDeviceLocal{device, buffer};
+                destOffset = 0;
+                for (const auto &r : reads)
+                {
+                    rl.ptr.push_back(ptr + destOffset);
+                    destOffset += r.size;
+                }
             }
             return rl;
         }
