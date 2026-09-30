@@ -58,6 +58,14 @@ namespace mgi
     };
 
 
+    struct VulkanPipelineInfo {
+        vk::DescriptorSetLayout setLayout;
+        vk::PipelineLayout pipeLayout;
+        vk::Pipeline pipeline;
+        vk::DescriptorPool pool;
+        std::vector<uint32_t> bindings;
+    };
+
     class VulkanDeferredAPI
     {
 
@@ -123,6 +131,21 @@ namespace mgi
             vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
             cmd.begin(beginInfo);
             return cmd;
+        }
+
+        static void deleteHostAccessable(std::vector<void *> &ptr, void *cData)
+        {
+            CDVulkanHostAccessable *data = (CDVulkanHostAccessable *)cData;
+            data->device.unmapMemory(data->memory);
+            delete data;
+        }
+
+        static void deleteDeviceLocal(std::vector<void *> &ptr, void *cData)
+        {
+            CDVulkanDeviceLocal *data = (CDVulkanDeviceLocal *)cData;
+            data->device.unmapMemory(data->packed.memory);
+            data->packed.destroy(data->device);
+            delete data;
         }
 
     public:
@@ -205,22 +228,6 @@ namespace mgi
                 b.destroy(device);
             return allocated;
         }
-
-        static void deleteHostAccessable(std::vector<void *> &ptr, void *cData)
-        {
-            CDVulkanHostAccessable *data = (CDVulkanHostAccessable *)cData;
-            data->device.unmapMemory(data->memory);
-            delete data;
-        }
-
-        static void deleteDeviceLocal(std::vector<void *> &ptr, void *cData)
-        {
-            CDVulkanDeviceLocal *data = (CDVulkanDeviceLocal *)cData;
-            data->device.unmapMemory(data->packed.memory);
-            data->packed.destroy(data->device);
-            delete data;
-        }
-
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads)
         {

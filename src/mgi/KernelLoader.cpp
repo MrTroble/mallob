@@ -5,6 +5,10 @@
 #include <CL/opencl.hpp>
 #endif
 
+#ifdef MGI_API_VULKAN_HOST
+#include <SPIRV-Reflect/spirv_reflect.h>
+#endif
+
 volatile int gdb_attached = 0;
 
 namespace mgi
@@ -75,15 +79,66 @@ namespace mgi
     Kernel KernelLoader::loadKernel(VulkanDeferredAPI *api, const std::string &file)
     {
         // TODO Caching
-        const auto source = mgi::wholeFile<std::string>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file + "_v.spv");
+        const auto source = mgi::wholeFile<std::vector<char>>(std::string(MALLOB_SUBPROC_DISPATCH_PATH "/") + file + "_v.spv");
         if (source.empty())
             return {};
 
         const auto deviceID = api->selectDevice();
         const auto device = api->setup.devices[deviceID];
 
+        SpvReflectShaderModule moduleReflect;
+        SpvReflectResult result = spvReflectCreateShaderModule(source.size(), source.data(), &moduleReflect);
+        if(result != SPV_REFLECT_RESULT_SUCCESS) {
+            LOG(V0_CRIT, "Could not create reflections of shader %s\n!", file.c_str());
+            return {};
+        }
+        const auto sModule = device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t *)source.data()));
+        span entryPoints(moduleReflect.entry_points, moduleReflect.entry_point_count);
+        std::unordered_map<std::string, VulkanPipelineInfo> pipeInfoLookup;
+        for(const auto& ep : entryPoints) {
+            LOG(V2_INFO, "Found entry point %s\n", ep.name);
+            const auto& desc = *ep.descriptor_sets;
+            assert(ep.descriptor_set_count == 1);
+            std::vector<vk::DescriptorSetLayoutBinding> bindings;
+            span descSpan(desc.bindings, desc.binding_count);
+            VulkanPipelineInfo pipeInfos;
+            for(const auto desc : descSpan) {
+                vk::DescriptorSetLayoutBinding descBinding(desc->binding, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute);
+                bindings.push_back(descBinding);
+                pipeInfos.bindings.push_back(desc->binding);
+            }
+
+            std::vector<vk::PushConstantRange> range;
+            span pushSpan(ep.used_push_constants, ep.used_push_constant_count);
+            for(const auto pConst : pushSpan) {
+                span searchSpan(moduleReflect.push_constant_blocks, moduleReflect.push_constant_block_count);
+                auto iter = std::find_if(searchSpan.begin(), searchSpan.end(), [=](const auto& p) { return p.spirv_id == pConst; });
+                if(iter == std::end(searchSpan)) {
+                    LOG(V0_CRIT, "Could not find push const with SPIRV-ID %d\n", pConst);
+                    continue;
+                }
+                range.push_back({vk::ShaderStageFlagBits::eCompute, iter->offset, iter->size});
+            }
+            vk::DescriptorSetLayoutCreateInfo descSetLayoutCreate({}, bindings);
+            pipeInfos.setLayout = device.createDescriptorSetLayout(descSetLayoutCreate);
+            vk::DescriptorPoolSize descPoolSize(vk::DescriptorType::eStorageBuffer, 1000u);
+            pipeInfos.pool = device.createDescriptorPool({{}, 1000u, descPoolSize});
+            vk::PipelineLayoutCreateInfo pipeLayoutCreate({}, pipeInfos.setLayout, range);
+            pipeInfos.pipeLayout = device.createPipelineLayout(pipeLayoutCreate);
+
+            vk::PipelineShaderStageCreateInfo shaderStageInfo({}, vk::ShaderStageFlagBits::eCompute, sModule, ep.name);
+            vk::ComputePipelineCreateInfo computePipeCreate({}, shaderStageInfo, pipeInfos.pipeLayout);
+            const auto result = device.createComputePipeline({}, computePipeCreate);
+            if(result.result != vk::Result::eSuccess) {
+                LOG(V0_CRIT, "Could not create pipe for shader entry point %s\n", ep.name);
+            }
+            pipeInfos.pipeline = result.value;
+            pipeInfoLookup[ep.name] = pipeInfos;
+        }
+        spvReflectDestroyShaderModule(&moduleReflect);
+
         std::lock_guard lg(api->shaderModuleLock);
-        api->shaderModules.push_back(device.createShaderModule(vk::ShaderModuleCreateInfo({}, source.size(), (const uint32_t *)source.data())));
+        api->shaderModules.push_back(sModule);
         const auto id = api->shaderModules.size() - 1;
         return {id};
     }

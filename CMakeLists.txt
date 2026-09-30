@@ -283,7 +283,7 @@ elseif(${MALLOB_GPU_API} STREQUAL "VULKAN")
     find_package(Vulkan 1.4 REQUIRED)
 
     message(${Vulkan_LIBRARIES})
-    set(BASE_LIBS ${BASE_LIBS} "${Vulkan_LIBRARIES}")
+    set(BASE_LIBS ${BASE_LIBS} "${Vulkan_LIBRARIES}" "$ENV{LD_LIBRARY_PATH}/libspirv-reflect-static.a")
     set(BASE_INCLUDES ${BASE_INCLUDES} ${Vulkan_INCLUDE_DIRS})
 
     FetchContent_Declare(
