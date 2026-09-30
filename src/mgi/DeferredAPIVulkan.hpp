@@ -43,6 +43,11 @@ namespace mgi
         size_t offset;
     };
 
+    struct CDVulkanHostAccessable {
+        vk::Device device;
+        vk::DeviceMemory memory;
+    };
+
     class VulkanDeferredAPI
     {
 
@@ -52,6 +57,9 @@ namespace mgi
         KernelLoader loader;
         ProtectedMap<std::unordered_map<size_t, VulkanMemoryRegion>> bufferToMemLookup;
         ProtectedMap<std::unordered_map<size_t, size_t>> memoryCounter;
+
+        ProtectedMap<std::unordered_map<size_t, MemoryType>> memoryType;
+        ProtectedMap<std::unordered_map<size_t, std::shared_mutex*>> memoryMutex;
 
         friend class KernelLoader;
 
@@ -100,7 +108,7 @@ namespace mgi
             std::vector<Memory> allocated;
             const auto deviceID = selectDevice();
             const auto &memTypeIndices = setup.memoryTypeIndices[deviceID];
-            const auto &device = setup.devices[deviceID];
+            const auto device = setup.devices[deviceID];
 
             std::vector<MemoryRequirements> requirements;
             for (const auto &region : infos)
@@ -139,13 +147,15 @@ namespace mgi
                 device.bindBufferMemory(buffer, mem, region.offset);
 
                 bufferToMemLookup.insert({intMem.internal, VulkanMemoryRegion{mem, region.offset}});
+                memoryMutex.insert({intMem.internal, new std::shared_mutex});
                 const auto memid = *((size_t*)&mem);
                 memoryCounter.insertOrUpdate(memid, 1, [](size_t el) { return el + 1; });
                 
                 const auto &info = infos[i];
+                memoryType.insert({intMem.internal, info.type});
                 if (info.initialSize != 0 && info.initialMemory)
                 {
-                    if (isHostWritable(info.type))
+                    if (isHostAccessable(info.type))
                     {
                         upload<uint8_t>(device, mem, span<uint8_t>{(uint8_t *)info.initialMemory, info.initialSize}, region.offset);
                     }
@@ -167,13 +177,39 @@ namespace mgi
             queue.submit(submitInfo, fence);
             const auto result = device.waitForFences(fence, true, UINT64_MAX);
             CHECK_RESULT(result);
+            device.freeCommandBuffers(cmdPool, cmd);
+            device.destroy(fence);
+            for(auto& b : packedBuffer) b.destroy(device);
             return allocated;
+        }
+
+        static void deleteHostAccessable(std::vector<void*>& ptr, void* cData) {
+            CDVulkanHostAccessable* data = (CDVulkanHostAccessable*) cData;
+            data->device.unmapMemory(data->memory);
+            delete data;
         }
 
         ReadLock readMemory(Memory memory, span<const ReadInfo> reads)
         {
-            assert(!reads.empty());
-            return {};
+            ReadLock rl;
+            rl.lock = std::shared_lock(*memoryMutex[memory.internal]);
+            MemoryType type = memoryType[memory.internal];
+            const auto infoMem = bufferToMemLookup[memory.internal];
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+
+            if(isHostAccessable(type)) {
+                uint8_t* ptr = (uint8_t*)device.mapMemory(infoMem.memory, infoMem.offset, VK_WHOLE_SIZE);
+                rl.ptr.reserve(reads.size());
+                rl.releaseFunction = &deleteHostAccessable;
+                rl.customData = new CDVulkanHostAccessable{device, infoMem.memory};
+                for(const auto& r : reads) {
+                    rl.ptr.push_back(ptr + r.offset);
+                }
+            } else {
+                
+            }
+            return rl;
         }
 
         inline void writeMemory(Memory memory, span<const BufferUpdateInfo> updates)

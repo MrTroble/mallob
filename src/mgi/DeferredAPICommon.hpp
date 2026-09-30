@@ -124,7 +124,7 @@ namespace mgi
         Constant     // Kernel read only
     };
 
-    inline bool isHostWritable(MemoryType type)
+    inline bool isHostAccessable(MemoryType type)
     {
         switch (type)
         {

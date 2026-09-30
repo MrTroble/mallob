@@ -196,7 +196,7 @@ namespace mgi
                 typesToInsert.emplace_back(Memory{(size_t)buffer}, info.type);
                 if (info.initialMemory == nullptr || info.initialSize == 0)
                     continue;
-                if (isHostWritable(info.type))
+                if (isHostAccessable(info.type))
                 { // TODO: This can be segregated earlier for more performance
                     cl_event event{};
                     MGI_DB_CHECK(clEnqueueWriteBuffer(queue, buffer, false, 0, info.initialSize, info.initialMemory, 0, nullptr, &event),
@@ -255,7 +255,7 @@ namespace mgi
             std::vector<cl_event> events(reads.size());
             mgi::OnExit raiiEventsHandle([&]()
                                          { for(auto event : events) clRetainEvent(event); });
-            if (isHostWritable(typesCreated[memory]))
+            if (isHostAccessable(typesCreated[memory]))
             {
                 size_t index = 0;
                 // This is shit, have locally cached versions
@@ -326,7 +326,7 @@ namespace mgi
             const auto queue = selectQueue();
             const auto buffer = (cl_mem)memory.internal;
             const auto type = typesCreated[memory];
-            if (isHostWritable(type))
+            if (isHostAccessable(type))
             {
                 std::vector<cl_event> events(updates.size());
                 mgi::OnExit raiiEventsHandle([&]()
