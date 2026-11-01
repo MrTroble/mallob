@@ -104,4 +104,8 @@ This is not to be confused with `Device` memory types. Device memory types are u
     #define MGI_LOCAL private 
 ```
 
+### Architecture
+
+![ArchMGI](pictures/MGI.png)
+
 TODO -> From Notes
