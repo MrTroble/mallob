@@ -75,4 +75,33 @@ These defines can be used to check for features in the code C++ host code.
 |`MGI_API_OCL`| Enabled if OpenCL is used as backend 
 |`MALLOB_USE_GPU`| Enabled if MGI is enabled.
 
+
+## Basics
+
+![Arch](pictures/arch.png)
+
+### Memory types
+
+`Allocation` type describes the allocation location and features of the memory. This is controlled by the host and is represented by the `MemoryType` enum. They control which device (Host or GPU) can read and write to the memory.
+If both device have access at all time to the memory it highers the amount of overhead for each memory access. While memory with less access rights needs more time during host updates (with writeMemory, readMemory).
+
+```cpp
+    enum class MemoryType
+    {
+        Global,      // All read/write
+        Uniform,     // Host read/write, Kernel read only
+        DeviceLocal, // Kernel read/write only
+        Constant     // Kernel read only
+    };
+```
+
+This is not to be confused with `Device` memory types. Device memory types are used in the shaders and only control which memory in the device hirachie is used. Memory allocated by the host is always `MGI_GLOBAL` memory. The other types can be seen in the diagram. `MGI_LOCAL` are registers which can be seen in the subgroup space. `MGI_SHARED` is the shared memory that is shared between subgroups. They have increasingly less latency.
+
+```cpp
+    #define MGI_GLOBAL global 
+    #define MGI_SHARED local 
+    #define MGI_CONST const constant
+    #define MGI_LOCAL private 
+```
+
 TODO -> From Notes
