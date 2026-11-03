@@ -136,7 +136,8 @@ namespace mgi
             pipeInfoLookup[ep.name] = pipeInfos;
         }
         spvReflectDestroyShaderModule(&moduleReflect);
-
+        api->pipelineInfo.push_back(pipeInfoLookup);
+        
         std::lock_guard lg(api->shaderModuleLock);
         api->shaderModules.push_back(sModule);
         const auto id = api->shaderModules.size() - 1;

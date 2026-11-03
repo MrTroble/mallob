@@ -64,6 +64,7 @@ namespace mgi
         vk::Pipeline pipeline;
         vk::DescriptorPool pool;
         std::vector<uint32_t> bindings;
+        vk::DescriptorSet set;
     };
 
     class VulkanDeferredAPI
@@ -78,6 +79,7 @@ namespace mgi
 
         ProtectedMap<std::unordered_map<size_t, MemoryType>> memoryType;
         ProtectedMap<std::unordered_map<size_t, std::shared_mutex *>> memoryMutex;
+        std::vector<std::unordered_map<std::string, VulkanPipelineInfo>> pipelineInfo;
 
         friend class KernelLoader;
 
@@ -289,9 +291,42 @@ namespace mgi
                 return;
         }
 
+        inline std::array<uint32_t, 3> getWorkgroupAmount(const TaskInfo& info, Kernel kernel)
+        {
+            float DIVIDER[3] = {1, 1, 1};
+            size_t counter = 0;
+            for(auto x : info.groupSizes) {
+                DIVIDER[counter] = x; 
+                if((x != 32 && x != 1)) {
+                    LOG(V1_WARN, "Vulkan workgroup sizes must be 1 or 32, will be promoted to 32!\n");
+                    DIVIDER[counter] = 32;
+                }
+                counter++;
+            }
+            return {ceil(info.range[0] / DIVIDER[0]), ceil(info.range[1] / DIVIDER[1]), 
+                ceil(info.range[2] / DIVIDER[2])};
+        }
+
         std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy &strategy = {})
         {
-            return {};
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+            const auto cmdPool = setup.commandPools[deviceID];
+            
+            auto cmd = beginAndGet(device, cmdPool);
+            std::vector<Task> queuedTasks;
+            for(auto& task : tasks) {
+                const auto event = device.createEvent({});
+                const auto &pipeInfo = pipelineInfo[task.kernel.internal][task.function];
+                cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipeInfo.pipeline);
+                cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipeInfo.pipeLayout, 0, pipeInfo.set, {});
+                const auto workgroupAmount = getWorkgroupAmount(task, task.kernel);
+                cmd.dispatch(workgroupAmount[0], workgroupAmount[1], workgroupAmount[2]);
+                // TODO use set 2
+                cmd.setEvent(event, vk::PipelineStageFlagBits::eComputeShader);
+                queuedTasks.push_back({(size_t)(VkEvent)event});
+            }
+            return queuedTasks;
         }
 
         void waitTasks(span<const Task> tasks)
@@ -300,7 +335,8 @@ namespace mgi
 
         std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
         {
-            return {};
+            waitTasks(queueTasks(taskInfos, strategy));
+            return std::vector<TaskStatus>(taskInfos.size(), TaskStatus::Complete);
         }
 
         std::vector<TaskStatus> getStatus(span<const Task> tasks)
