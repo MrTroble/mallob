@@ -109,7 +109,7 @@ namespace mgi
             }
 
             std::vector<vk::PushConstantRange> range;
-            span pushSpan(ep.used_push_constants, ep.used_push_constant_count);
+            span<const uint32_t> pushSpan(ep.used_push_constants, ep.used_push_constant_count);
             for(const auto pConst : pushSpan) {
                 span searchSpan(moduleReflect.push_constant_blocks, moduleReflect.push_constant_block_count);
                 auto iter = std::find_if(searchSpan.begin(), searchSpan.end(), [=](const auto& p) { return p.spirv_id == pConst; });
@@ -133,6 +133,7 @@ namespace mgi
                 LOG(V0_CRIT, "Could not create pipe for shader entry point %s\n", ep.name);
             }
             pipeInfos.pipeline = result.value;
+            pipeInfos.pushConstants = std::move(range);
             pipeInfoLookup[ep.name] = pipeInfos;
         }
         spvReflectDestroyShaderModule(&moduleReflect);

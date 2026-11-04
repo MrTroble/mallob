@@ -64,7 +64,7 @@ namespace mgi
         vk::Pipeline pipeline;
         vk::DescriptorPool pool;
         std::vector<uint32_t> bindings;
-        vk::DescriptorSet set;
+        std::vector<vk::PushConstantRange> pushConstants;
     };
 
     class VulkanDeferredAPI
@@ -303,8 +303,8 @@ namespace mgi
                 }
                 counter++;
             }
-            return {ceil(info.range[0] / DIVIDER[0]), ceil(info.range[1] / DIVIDER[1]), 
-                ceil(info.range[2] / DIVIDER[2])};
+            return {(uint32_t)ceil(info.range[0] / DIVIDER[0]), (uint32_t)ceil(info.range[1] / DIVIDER[1]), 
+                (uint32_t)ceil(info.range[2] / DIVIDER[2])};
         }
 
         std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy &strategy = {})
@@ -315,22 +315,52 @@ namespace mgi
             
             auto cmd = beginAndGet(device, cmdPool);
             std::vector<Task> queuedTasks;
+            queuedTasks.reserve(tasks.size());
             for(auto& task : tasks) {
                 const auto event = device.createEvent({});
                 const auto &pipeInfo = pipelineInfo[task.kernel.internal][task.function];
+                const auto descriptorSet = device.allocateDescriptorSets({pipeInfo.pool, pipeInfo.setLayout}).back();
+
+                // TODO Unroll and enable prebacked!
+                size_t counter = 0;
+                for(const auto descriptor : task.descriptor.memory) {
+                    vk::DescriptorBufferInfo bufferInfo{(VkBuffer)descriptor.internal, 0, VK_WHOLE_SIZE};
+                    vk::WriteDescriptorSet write(descriptorSet, pipeInfo.bindings[counter], 0, vk::DescriptorType::eStorageBuffer, {}, bufferInfo);
+                    device.updateDescriptorSets(write, {});
+                    counter++;
+                }
+
                 cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipeInfo.pipeline);
-                cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipeInfo.pipeLayout, 0, pipeInfo.set, {});
+                if(!pipeInfo.pushConstants.empty()) {
+                    uint32_t sizes[3] = {(uint32_t)task.range[0], (uint32_t)task.range[1], (uint32_t)task.range[2]};
+                    cmd.pushConstants(pipeInfo.pipeLayout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(sizes), &sizes);
+                }
+                cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipeInfo.pipeLayout, 0, descriptorSet, {});
                 const auto workgroupAmount = getWorkgroupAmount(task, task.kernel);
                 cmd.dispatch(workgroupAmount[0], workgroupAmount[1], workgroupAmount[2]);
                 // TODO use set 2
                 cmd.setEvent(event, vk::PipelineStageFlagBits::eComputeShader);
                 queuedTasks.push_back({(size_t)(VkEvent)event});
             }
+            cmd.end();
+            const auto queue = selectQueue();
+            vk::SubmitInfo submitInfo = {{}, {}, cmd};
+            queue.submit(submitInfo, nullptr);
             return queuedTasks;
         }
 
         void waitTasks(span<const Task> tasks)
         {
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+
+            auto cmd = beginAndGet(device, setup.commandPools[deviceID]);
+            vk::MemoryBarrier2 barrier(vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead, 
+                vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead);
+            std::vector<vk::MemoryBarrier2> barriers(tasks.size(), barrier);
+            vk::DependencyInfo depInfo({}, barriers);
+            cmd.waitEvents2(tasks.size(), (vk::Event*)tasks.data(), &depInfo);
+            endSubmitAndWait(device, setup.commandPools[deviceID], cmd);
         }
 
         std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
@@ -351,14 +381,30 @@ namespace mgi
 
         void copyMemoryWait(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos)
         {
+            const auto task = copyMemory(source, destination, copyInfos);
+            waitTasks({&task, 1});
         }
 
         inline void freeObj(Memory memory)
         {
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+            device.destroyBuffer((VkBuffer)memory.internal);
+            memoryCounter.insertOrUpdate(memory.internal, 0, [](size_t el)
+                                             { return el - 1; });
+            if(memoryCounter[memory.internal] == 0) {
+                const auto infoMem = bufferToMemLookup[memory.internal];
+                device.freeMemory(infoMem.memory);
+                memoryMutex.insert({memory.internal, nullptr});
+            }
+            bufferToMemLookup.insert({memory.internal, VulkanMemoryRegion{nullptr, 0}});
         }
 
         inline void freeObj(Task task)
         {
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+            device.destroyEvent((VkEvent)task.internal);
         }
     };
 
