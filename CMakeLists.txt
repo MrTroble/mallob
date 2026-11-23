@@ -339,6 +339,13 @@ foreach(file ${kernelfiles})
 endforeach()
 message("Enabled test compile!")
 add_custom_target(shaderTarget DEPENDS ${SPV_TARGETS})
+else()
+# Without the test compile, the kernel loader still reads the kernels and MGI's kernel headers
+# from <dispatch path>/mgi_kernel at run time.
+foreach(file ${kernelfiles})
+  get_filename_component(filename "${file}" NAME)
+  configure_file(${file} ${CMAKE_BINARY_DIR}/mgi_kernel/${filename} COPYONLY)
+endforeach()
 endif()
 
 endif()

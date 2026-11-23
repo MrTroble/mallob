@@ -1,6 +1,9 @@
 #include "KernelLoader.hpp"
 #include "DeferredAPI.hpp"
 
+#include <algorithm>
+#include <cstdio>
+
 #ifdef MGI_API_OCL_HOST
 #include <CL/opencl.hpp>
 #endif
@@ -15,6 +18,56 @@ namespace mgi
 {
 
 #ifdef MGI_API_OCL_HOST
+    // The major OpenCL C versions a device supports.
+    static std::vector<cl_uint> openclCMajors(const cl::Device &device)
+    {
+        std::vector<cl_uint> majors;
+        size_t bytes = 0;
+        if (clGetDeviceInfo(device(), CL_DEVICE_OPENCL_C_ALL_VERSIONS, 0, nullptr, &bytes) == CL_SUCCESS && bytes > 0)
+        {
+            std::vector<cl_name_version> versions(bytes / sizeof(cl_name_version));
+            if (clGetDeviceInfo(device(), CL_DEVICE_OPENCL_C_ALL_VERSIONS, bytes, versions.data(), nullptr) == CL_SUCCESS)
+            {
+                for (const auto &version : versions)
+                    majors.push_back(CL_VERSION_MAJOR(version.version));
+                return majors;
+            }
+        }
+        // Before OpenCL 3.0 a device names one version: "OpenCL C <major>.<minor> ..."
+        char text[256] = {};
+        unsigned major = 0, minor = 0;
+        if (clGetDeviceInfo(device(), CL_DEVICE_OPENCL_C_VERSION, sizeof(text) - 1, text, nullptr) == CL_SUCCESS &&
+            std::sscanf(text, "OpenCL C %u.%u", &major, &minor) == 2)
+            majors.push_back(major);
+        return majors;
+    }
+
+    // NVIDIA keeps MGI's original options. Elsewhere the NVIDIA-only flags are invalid, and so is
+    // -cl-std=CL2.0 on a device without OpenCL C 2.0 (PoCL's CUDA driver offers 1.2 and 3.0).
+    static std::string compilerOptionsFor(const OCLSetup &init)
+    {
+        const std::string tail = " -D MGI_API_OCL -I ./";
+        if (init.platform.getInfo<CL_PLATFORM_NAME>().find("NVIDIA") != std::string::npos)
+        {
+            std::string additionalOptions;
+#ifdef DEBUG
+            additionalOptions += "-cl-nv-verbose -cl-nv-opt-level=0";
+#endif
+            return additionalOptions + " -cl-std=CL2.0" + tail;
+        }
+        const auto everyDeviceHas = [&](cl_uint major)
+        {
+            return std::all_of(init.devicesUsed.begin(), init.devicesUsed.end(), [&](const cl::Device &device)
+                               { const auto majors = openclCMajors(device);
+                                 return std::find(majors.begin(), majors.end(), major) != majors.end(); });
+        };
+        if (everyDeviceHas(2))
+            return "-cl-std=CL2.0" + tail;
+        if (everyDeviceHas(3))
+            return "-cl-std=CL3.0" + tail;
+        return tail.substr(1);
+    }
+
     Kernel KernelLoader::loadKernel(OCLDeferredAPI *api, const std::string &file)
     {
         // TODO Auto package binaries
@@ -32,12 +85,8 @@ namespace mgi
 
         std::vector<cl::Program> defaultIncludePrograms{kernelDefsProgram, kernelShared};
         std::vector<std::string> defaultIncludeNames{"MGIKernelDefs.hpp", "MGIShared.hpp"};
-        std::string additionalOptions;
-#ifdef DEBUG
-        // TODO CHECK available
-        additionalOptions += "-cl-nv-verbose -cl-nv-opt-level=0";
-#endif
-        std::string compilerOptions = additionalOptions + " -cl-std=CL2.0 -D MGI_API_OCL -I ./";
+        const std::string compilerOptions = compilerOptionsFor(api->init);
+        LOG(V3_VERB, "MGI kernel options for %s: %s\n", file.c_str(), compilerOptions.c_str());
 
         try
         {

@@ -65,7 +65,7 @@ namespace mgi
     class OCLDeferredAPI
     {
         OCLSetup init;
-        KernelLoaderOCL loader;
+        KernelLoader loader;
         std::vector<cl::Program> programs;
         ProtectedMap<std::unordered_map<Memory, MemoryType>> typesCreated;
         ProtectedMap<std::unordered_map<Memory, std::shared_mutex *>> perMemoryMutex;
@@ -145,7 +145,11 @@ namespace mgi
 
         std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
         {
-            const auto slabsToAllocate = strategy.slabs(infos);
+            // OpenCL needs no more than the requested size of a buffer.
+            std::vector<MemoryRequirements> requirements(infos.size());
+            std::transform(infos.begin(), infos.end(), requirements.begin(), [](const AllocationInfo &info)
+                           { return MemoryRequirements{info.size, 1}; });
+            const auto slabsToAllocate = strategy.slabs(infos, requirements);
             std::vector<cl_mem> subBuffers;
             {
                 std::vector<cl_mem> slabs;
@@ -160,7 +164,7 @@ namespace mgi
                 }
                 if (strategy.needsSubBuffers(infos))
                 {
-                    const auto regions = strategy.regions(infos);
+                    const auto regions = strategy.regions(infos, requirements);
                     subBuffers.resize(infos.size());
                     for (size_t i = 0; i < infos.size(); i++)
                     {
@@ -485,6 +489,33 @@ namespace mgi
         }
     };
 
+    // Some implementations (e.g. PoCL's CUDA driver) refuse out-of-order queues. An in-order
+    // queue then runs the same commands, in submission order.
+    inline cl::CommandQueue createQueue(const cl::Context &context, const cl::Device &device,
+                                        cl_command_queue_properties flags)
+    {
+        cl_int error = CL_SUCCESS;
+        cl::CommandQueue queue;
+#if defined(CL_HPP_ENABLE_EXCEPTIONS)
+        try
+        {
+            queue = cl::CommandQueue(context, device, flags, &error);
+        }
+        catch (const cl::Error &e)
+        {
+            if (e.err() != CL_INVALID_QUEUE_PROPERTIES)
+                throw;
+            error = e.err();
+        }
+#else
+        queue = cl::CommandQueue(context, device, flags, &error);
+#endif
+        if (error != CL_INVALID_QUEUE_PROPERTIES)
+            return queue;
+        LOG(V2_INFO, "The device refuses out-of-order queues; using an in-order queue\n");
+        return cl::CommandQueue(context, device, 0);
+    }
+
     inline OCLSetup initMGI(const InitInfo &info = {})
     {
         OCLSetup setup;
@@ -543,8 +574,7 @@ namespace mgi
             {
                 if (priority != 1.0f)
                     LOG(V1_WARN, "Currently priorities other then 1.0f are unsupported\n");
-                cl::CommandQueue queue(setup.context, device, queueFlags);
-                deviceQueues.emplace_back(std::move(queue));
+                deviceQueues.emplace_back(createQueue(setup.context, device, queueFlags));
             }
         }
         return setup;
