@@ -2,6 +2,8 @@
 
 To use GPU accelerated sat solving, the mallob gpu api (MGI) needs to be enabled.
 
+GPAP's GPU clause mining also runs on MGI: see [gpap.md](gpap.md).
+
 ## Prerequisits
 
 > [!WARNING]  

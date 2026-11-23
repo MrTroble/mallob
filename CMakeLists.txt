@@ -350,6 +350,38 @@ endif()
 
 endif()
 
+# GPAP (GPU clause mining) as a library, running on the GPU through MGI
+if(MALLOB_USE_GPAP)
+    if(CMAKE_VERSION VERSION_LESS 3.18)
+        message(FATAL_ERROR "MALLOB_USE_GPAP needs CMake 3.18 or later (FetchContent's SOURCE_SUBDIR)")
+    endif()
+    if(NOT MALLOB_USE_GPU OR NOT MALLOB_GPU_API STREQUAL "OPENCL")
+        message(FATAL_ERROR "MALLOB_USE_GPAP needs MALLOB_USE_GPU=1 with the OpenCL API")
+    endif()
+    # MGI does its GPU work only in an assert build: elsewhere MGI_DB_CHECK compiles its OpenCL
+    # calls out, and GPAP would read back memory nothing ever wrote.
+    if(NOT MALLOB_ASSERT AND NOT MALLOB_ASSERT_HEAVY AND NOT CMAKE_BUILD_TYPE MATCHES DEBUG)
+        message(FATAL_ERROR "MALLOB_USE_GPAP needs MALLOB_ASSERT=1 (or MALLOB_ASSERT_HEAVY): "
+                            "without it MGI compiles its GPU calls out")
+    endif()
+    set(GPAP_WITH_CUDA OFF CACHE BOOL "" FORCE)
+    set(GPAP_SHARED OFF CACHE BOOL "" FORCE)
+    set(GPAP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    # GPAP's mallob-mgi branch, pinned by commit until it is merged into GPAP's main (main lacks
+    # GPAP_WITH_CUDA and the host-plug API). To build against a local GPAP checkout instead, pass
+    # -DFETCHCONTENT_SOURCE_DIR_GPAP=<checkout>.
+    FetchContent_Declare(gpap
+        GIT_REPOSITORY https://github.com/yogevshalmon/gpap
+        GIT_TAG        eb641cce7b3f6792a6d0552930782dab647b1f3e
+        SOURCE_SUBDIR  cpp)
+    FetchContent_MakeAvailable(gpap)
+    # MGI's loader reads kernels from <dispatch path>/<file> at run time.
+    configure_file(${gpap_SOURCE_DIR}/cpp/kernels/bcp.cl ${CMAKE_BINARY_DIR}/gpap_kernel/bcp.cl COPYONLY)
+    set(BASE_LIBS ${BASE_LIBS} gpap::gpap)
+    set(MALLOB_CORE_SOURCES ${MALLOB_CORE_SOURCES} src/app/sat/gpap/mgi_gpu.cpp)
+    add_definitions(-DMALLOB_USE_GPAP=1)
+endif()
+
 # Library of Mallob's CORE sources
 
 #message("mallob_commons sources post application registration: ${BASE_SOURCES}") # Use to debug
@@ -411,4 +443,7 @@ new_test(bidirectional_pipe_shmem "${BASE_INCLUDES}" mallob_core)
 
 if(MALLOB_USE_GPU)
 new_test(mgi_base "${BASE_INCLUDES}" mallob_corepluscomm)
+if(MALLOB_USE_GPAP)
+new_test(gpap_mgi "${BASE_INCLUDES}" mallob_corepluscomm)
+endif()
 endif()
