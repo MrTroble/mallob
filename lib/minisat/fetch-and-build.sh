@@ -9,7 +9,7 @@ fetch_and_extract $dirname Makefile https://github.com/domschrei/minisat/archive
 echo "[$dirname] Building ..."
 mkdir -p build
 cd build
-cmake -DMINISAT_QUIET=1 ..
+cmake -D CMAKE_POLICY_VERSION_MINIMUM=3.5 -DMINISAT_QUIET=1 ..
 make
 cd ..
 echo "[$dirname] Build complete"

@@ -1355,7 +1355,7 @@ void SweepJob::cbContributeToAllReduce() {
 		md.eq_size = eqs.size();
 		md.unit_size = units.size();
 		assert(md.eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", md.eq_size));
-		LOGGER(_sweeplogger,V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), md.eq_size, md.unit_size, sweeper->sweeper_is_idle);
+		LOGGER(_sweeplogger,V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), md.eq_size, md.unit_size, sweeper->sweeper_is_idle.load(std::memory_order_relaxed));
 		_rank_contributed_equalities += md.eq_size/2;
 		_rank_contributed_units += md.unit_size;
 		//Format: [eqs, units, metadata]

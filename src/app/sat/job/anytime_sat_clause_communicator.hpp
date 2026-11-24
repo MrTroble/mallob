@@ -9,11 +9,8 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
-<<<<<<< HEAD
 #include "gpu_clause_interface.hpp"
-=======
 #include "comm/msg_queue/message_subscription.hpp"
->>>>>>> master
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"

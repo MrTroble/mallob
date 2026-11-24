@@ -16,6 +16,7 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
         "MALLOB_LOG_VERBOSITY": "5",
         "MALLOB_USE_ASAN": "1",
         "MALLOB_SUBPROC_DISPATCH_PATH": "\"${sourceDir}/build/${presetName}\"",
