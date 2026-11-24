@@ -45,7 +45,9 @@
       "inherits": "linux-debug-wsl",
       "cacheVariables": { "MALLOB_USE_GPU": true,
             "MALLOB_MGI_OCL_LAYERS": true,
-            "MALLOB_USE_ASAN": false}
+            "MALLOB_USE_ASAN": false,
+            "MALLOB_USE_GPAP": true
+          }
     },
     {
       "name": "linux-debug-gpu-vulkan",
